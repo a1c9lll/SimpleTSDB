@@ -44,6 +44,26 @@ func TestInvalidTags(t *testing.T) {
 	}
 }
 
+func TestInvalidMetricNameInInsertPoint(t *testing.T) {
+	if err := InsertPoint(&core.InsertPointsQuery{
+		Metric: " a b",
+	}); err == nil {
+		t.Fatal("expected error")
+	} else if err.Error() != "valid characters for metrics are a-z, A-Z, 0-9, and _" {
+		t.Fatal("wrong error")
+	}
+}
+
+func TestInvalidMetricNameInQuery(t *testing.T) {
+	if _, err := QueryPoints(&core.PointsQuery{
+		Metric: " a b",
+	}); err == nil {
+		t.Fatal("expected error")
+	} else if err.Error() != "valid characters for metrics are a-z, A-Z, 0-9, and _" {
+		t.Fatal("wrong error")
+	}
+}
+
 func TestMetricExists(t *testing.T) {
 	found, err := MetricExists("test0")
 	if err != nil {
@@ -101,7 +121,6 @@ func TestInsertPointAndQuery(t *testing.T) {
 			"id":   "25862",
 			"type": "high",
 		},
-		N:     10,
 		Start: time.Now().Add(-time.Hour * 1).UnixNano(),
 		End:   time.Now().UnixNano(),
 	})
