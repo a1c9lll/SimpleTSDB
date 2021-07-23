@@ -35,10 +35,8 @@ func CreateMetric(name string, tags []string) error {
 	if err != nil {
 		return err
 	}
-	if rows, err := session.Query(queryStr); err != nil {
+	if _, err = session.Query(queryStr); err != nil {
 		return err
-	} else {
-		_ = rows
 	}
 	return nil
 }
@@ -106,22 +104,28 @@ func generateTagsQueryString(tags map[string]string, queryVals []interface{}, ar
 
 func InsertPoint(query *core.InsertPointsQuery) error {
 	if !metricAndTagsRe.MatchString(query.Metric) {
-		return errors.New("valid characters for metric are a-z, A-Z, 0-9, and _")
+		return errors.New("valid characters for metrics are a-z, A-Z, 0-9, and _")
 	}
 	tagsStr, valuesStr, values, err := generatePointInsertionStringsAndValues(query)
 	if err != nil {
 		return err
 	}
 	queryStr := fmt.Sprintf(`insert into simpletsdb_%s (timestamp,%svalue) values ($1,%s$%d)`, query.Metric, tagsStr, valuesStr, len(values))
-	if rows, err := session.Query(queryStr, values...); err != nil {
+	if _, err = session.Query(queryStr, values...); err != nil {
 		return err
-	} else {
-		_ = rows
 	}
+
 	return nil
 }
 
 func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
+	if query.Metric == "" {
+		return nil, errors.New("metric is required to query points")
+	}
+	if !metricAndTagsRe.MatchString(query.Metric) {
+		return nil, errors.New("valid characters for metrics are a-z, A-Z, 0-9, and _")
+	}
+
 	if query.Start == 0 {
 		return nil, errors.New("query start is required")
 	}
