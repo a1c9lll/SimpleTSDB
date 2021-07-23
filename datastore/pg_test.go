@@ -23,6 +23,7 @@ func TestMain(t *testing.T) {
 
 	session.Query("drop table simpletsdb_test0")
 	session.Query("drop table simpletsdb_test1")
+	session.Query("drop table simpletsdb_test2")
 
 	err = CreateMetric("test0", []string{"id", "type"})
 	if err != nil {
@@ -32,15 +33,21 @@ func TestMain(t *testing.T) {
 
 func TestInvalidMetricName(t *testing.T) {
 	err := CreateMetric("a b", []string{})
+	if err == nil {
+		t.Fatal("expected error")
+	}
 	if err.Error() != "valid characters for metrics are a-z, A-Z, 0-9, and _" {
-		t.Fatal("wrong error")
+		t.Fatalf("wrong error: %s", err)
 	}
 }
 
 func TestInvalidTags(t *testing.T) {
 	err := CreateMetric("ab", []string{"c d"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
 	if err.Error() != "valid characters for tag names are a-z, A-Z, 0-9, and _" {
-		t.Fatal("wrong error")
+		t.Fatalf("wrong error: %s", err)
 	}
 }
 
@@ -50,7 +57,7 @@ func TestInvalidMetricNameInInsertPoint(t *testing.T) {
 	}); err == nil {
 		t.Fatal("expected error")
 	} else if err.Error() != "valid characters for metrics are a-z, A-Z, 0-9, and _" {
-		t.Fatal("wrong error")
+		t.Fatalf("wrong error: %s", err)
 	}
 }
 
@@ -60,7 +67,7 @@ func TestInvalidMetricNameInQuery(t *testing.T) {
 	}); err == nil {
 		t.Fatal("expected error")
 	} else if err.Error() != "valid characters for metrics are a-z, A-Z, 0-9, and _" {
-		t.Fatal("wrong error")
+		t.Fatalf("wrong error: %s", err)
 	}
 }
 
@@ -84,7 +91,7 @@ func TestInsertPointAndQuery(t *testing.T) {
 			},
 			Point: &core.Point{
 				Value:     183001000,
-				Timestamp: int64(time.Now().UnixNano()),
+				Timestamp: time.Now().UnixNano(),
 			},
 		},
 		{
@@ -95,7 +102,7 @@ func TestInsertPointAndQuery(t *testing.T) {
 			},
 			Point: &core.Point{
 				Value:     182599002,
-				Timestamp: int64(time.Now().UnixNano()),
+				Timestamp: time.Now().UnixNano(),
 			},
 		},
 		{
@@ -106,7 +113,7 @@ func TestInsertPointAndQuery(t *testing.T) {
 			},
 			Point: &core.Point{
 				Value:     183001199,
-				Timestamp: int64(time.Now().UnixNano()),
+				Timestamp: time.Now().UnixNano(),
 			},
 		},
 	} {
@@ -130,6 +137,44 @@ func TestInsertPointAndQuery(t *testing.T) {
 
 	if len(points) != 2 {
 		t.Fatalf("expected 2 points but got %d", len(points))
+	}
+}
+
+func TestDuplicateInsert(t *testing.T) {
+	err := CreateMetric("test2", []string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	timestamp := time.Now().UnixNano()
+	if err := InsertPoint(&core.InsertPointsQuery{
+		Metric: "test2",
+		Point: &core.Point{
+			Value:     182599002,
+			Timestamp: timestamp,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := InsertPoint(&core.InsertPointsQuery{
+		Metric: "test2",
+		Point: &core.Point{
+			Value:     182599002,
+			Timestamp: timestamp,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	pts, err := QueryPoints(&core.PointsQuery{
+		Metric: "test2",
+		Start:  time.Now().Add(-time.Hour).Local().UnixNano(),
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(pts) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(pts))
 	}
 }
 
