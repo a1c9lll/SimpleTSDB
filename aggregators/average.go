@@ -11,12 +11,14 @@ func Average(points []*core.Point) []*core.Point {
 		total          int
 		sum            float64
 		lastWindow     int64
+		lastFilled     bool
 		averagedPoints []*core.Point
 	)
 
 	sum = points[0].Value
 	lastWindow = points[0].Window
 	total = 1
+	lastFilled = points[0].Filled
 
 	if len(points) > 1 {
 		for i := 1; i < len(points); i++ {
@@ -25,24 +27,33 @@ func Average(points []*core.Point) []*core.Point {
 				sum += pt.Value
 				total++
 			} else {
-				averagedPoints = append(averagedPoints, &core.Point{
-					Value:     sum / float64(total),
-					Timestamp: lastWindow,
-					Window:    lastWindow,
-				})
+				if lastFilled {
+					averagedPoints = append(averagedPoints, points[i-1])
+				} else {
+					averagedPoints = append(averagedPoints, &core.Point{
+						Value:     sum / float64(total),
+						Timestamp: lastWindow,
+						Window:    lastWindow,
+					})
+				}
 				sum = pt.Value
 				total = 1
+				lastFilled = pt.Filled
 			}
 			lastWindow = pt.Window
 		}
 	}
 
 	if total > 0 {
-		averagedPoints = append(averagedPoints, &core.Point{
-			Value:     sum / float64(total),
-			Timestamp: lastWindow,
-			Window:    lastWindow,
-		})
+		if lastFilled {
+			averagedPoints = append(averagedPoints, points[len(points)-1])
+		} else {
+			averagedPoints = append(averagedPoints, &core.Point{
+				Value:     sum / float64(total),
+				Timestamp: lastWindow,
+				Window:    lastWindow,
+			})
+		}
 	}
 
 	return averagedPoints

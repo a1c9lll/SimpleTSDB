@@ -115,6 +115,35 @@ func TestAverage2(t *testing.T) {
 	}
 }
 
+func TestAverage3(t *testing.T) {
+	baseTime := time.Now().Add(-time.Minute)
+	pts := []*core.Point{}
+
+	pts, err := Window(baseTime.UnixNano(), baseTime.UnixNano(), map[string]interface{}{
+		"every":     "1m",
+		"fillGaps":  true,
+		"fillValue": -1,
+	}, pts)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pts = Average(pts)
+
+	if len(pts) != 1 {
+		t.Fatal()
+	}
+
+	if !pts[0].Filled {
+		t.Fatal()
+	}
+
+	if pts[0].Timestamp != pts[0].Window {
+		t.Fatal()
+	}
+}
+
 func TestSum(t *testing.T) {
 	baseDate := time.Now()
 	pts := []*core.Point{
@@ -273,5 +302,42 @@ func TestMax2(t *testing.T) {
 
 	require.Equal(t, []float64{
 		11,
+	}, vals)
+}
+
+func TestMax3(t *testing.T) {
+	baseDate := time.Now()
+	pts := []*core.Point{
+		{Value: 11, Timestamp: baseDate.Add(-time.Minute * 4).UnixNano()},
+		{Value: 12, Timestamp: baseDate.Add(-time.Minute * 3).UnixNano()},
+		{Value: 13, Timestamp: baseDate.Add(-time.Minute).UnixNano()},
+		{Value: 14, Timestamp: baseDate.UnixNano()},
+	}
+
+	pts, err := Window(baseDate.Add(-time.Minute*4).UnixNano(), time.Now().UnixNano(), map[string]interface{}{
+		"every":     "1m",
+		"fillGaps":  true,
+		"fillValue": -1,
+	}, pts)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pts = Max(pts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vals := []float64{}
+	for _, pt := range pts {
+		if pt.Timestamp != pt.Window {
+			t.Fatal()
+		}
+		vals = append(vals, pt.Value)
+	}
+
+	require.Equal(t, []float64{
+		11, 12, -1, 13, 14,
 	}, vals)
 }
