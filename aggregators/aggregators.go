@@ -3,10 +3,11 @@ package aggregators
 // A lot of code is duplicated in this file for efficiency.
 // Another approach would be to use the bucketize function
 // on the data. It would make each of these fns more concise.
-// However, bucketizing isn't necessary for the majority of
-// these fns.
+// However, bucketizing isn't necessary for many of these
+// aggregators.
 import (
 	"errors"
+	"math"
 	"simpletsdb/core"
 	"sort"
 )
@@ -14,6 +15,9 @@ import (
 var (
 	errCountFilledPointsType = errors.New("countFilledPoints must be boolean")
 	errNoModeValueType       = errors.New("noModeValue must be int or float")
+	errStdDevOptionInvalid   = errors.New("valid options for stddev mode are population and sample")
+	errStdDevModeType        = errors.New("stddev mode must be string")
+	errNoStdDevValueType     = errors.New("noStdDevValue must be int or float")
 )
 
 func Last(points []*core.Point) []*core.Point {
@@ -555,4 +559,96 @@ func Mode(options map[string]interface{}, points []*core.Point) ([]*core.Point, 
 	}
 
 	return modePoints, nil
+}
+
+func StdDev(options map[string]interface{}, points []*core.Point) ([]*core.Point, error) {
+	if len(points) == 0 {
+		return points, nil
+	}
+
+	var (
+		sampleStdDev       = true
+		noStdDevValue      float64
+		noStdDevValueFound bool
+	)
+
+	if v, ok := options["mode"]; ok {
+		switch v1 := v.(type) {
+		case string:
+			if v1 != "population" && v1 != "sample" {
+				return nil, errStdDevOptionInvalid
+			}
+			if v1 == "population" {
+				sampleStdDev = false
+			}
+		default:
+			return nil, errStdDevModeType
+		}
+	}
+
+	if v, ok := options["noStdDevValue"]; ok {
+		switch v1 := v.(type) {
+		case int:
+			noStdDevValue = float64(v1)
+		case int32:
+			noStdDevValue = float64(v1)
+		case int64:
+			noStdDevValue = float64(v1)
+		case float32:
+			noStdDevValue = float64(v1)
+		case float64:
+			noStdDevValue = v1
+		default:
+			return nil, errNoStdDevValueType
+		}
+		noStdDevValueFound = true
+	}
+
+	buckets := Bucketize(points)
+	stdDevedPoints := make([]*core.Point, len(buckets))
+
+	for i, bucket := range buckets {
+		if bucket[0].Filled {
+			stdDevedPoints[i] = bucket[0]
+			continue
+		}
+		if len(bucket) == 1 && sampleStdDev {
+			stdDevedPoints[i] = &core.Point{
+				Value:     noStdDevValue,
+				Timestamp: bucket[0].Window,
+				Window:    bucket[0].Window,
+				Null:      !noStdDevValueFound,
+			}
+			continue
+		}
+
+		var (
+			sum    float64
+			stdDev float64
+		)
+
+		for _, pt := range bucket {
+			sum += pt.Value
+		}
+
+		mean := sum / float64(len(bucket))
+
+		for _, pt := range bucket {
+			stdDev += math.Pow(pt.Value-mean, 2)
+		}
+
+		var lenM float64
+		if sampleStdDev {
+			lenM = float64(len(bucket) - 1)
+		} else {
+			lenM = float64(len(bucket))
+		}
+		stdDevedPoints[i] = &core.Point{
+			Value:     math.Sqrt(stdDev / lenM),
+			Timestamp: bucket[0].Window,
+			Window:    bucket[0].Window,
+		}
+	}
+
+	return stdDevedPoints, nil
 }
