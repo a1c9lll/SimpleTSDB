@@ -33,16 +33,16 @@ func TestWindow(t *testing.T) {
 	alignedStartTime := baseTime - baseTime%windowDur
 
 	require.Equal(t, []*core.Point{
-		{-1, alignedStartTime - time.Duration(time.Minute).Nanoseconds(), alignedStartTime - windowDur, true},
-		{1, baseDate.UnixNano(), alignedStartTime, false},
-		{2, baseDate.Add(time.Minute).UnixNano(), alignedStartTime + windowDur, false},
-		{-1, alignedStartTime + time.Duration(time.Minute*2).Nanoseconds(), alignedStartTime + windowDur*2, true},
-		{3, baseDate.Add(time.Minute * 3).UnixNano(), alignedStartTime + windowDur*3, false},
-		{4, baseDate.Add(time.Minute * 4).UnixNano(), alignedStartTime + windowDur*4, false},
-		{-1, alignedStartTime + time.Duration(time.Minute*5).Nanoseconds(), alignedStartTime + windowDur*5, true},
-		{5, baseDate.Add(time.Minute * 6).UnixNano(), alignedStartTime + windowDur*6, false},
-		{-1, alignedStartTime + time.Duration(time.Minute*7).Nanoseconds(), alignedStartTime + windowDur*7, true},
-		{-1, alignedStartTime + time.Duration(time.Minute*8).Nanoseconds(), alignedStartTime + windowDur*8, true},
+		{Value: -1, Timestamp: alignedStartTime - time.Duration(time.Minute).Nanoseconds(), Window: alignedStartTime - windowDur, Filled: true},
+		{Value: 1, Timestamp: baseDate.UnixNano(), Window: alignedStartTime, Filled: false},
+		{Value: 2, Timestamp: baseDate.Add(time.Minute).UnixNano(), Window: alignedStartTime + windowDur, Filled: false},
+		{Value: -1, Timestamp: alignedStartTime + time.Duration(time.Minute*2).Nanoseconds(), Window: alignedStartTime + windowDur*2, Filled: true},
+		{Value: 3, Timestamp: baseDate.Add(time.Minute * 3).UnixNano(), Window: alignedStartTime + windowDur*3, Filled: false},
+		{Value: 4, Timestamp: baseDate.Add(time.Minute * 4).UnixNano(), Window: alignedStartTime + windowDur*4, Filled: false},
+		{Value: -1, Timestamp: alignedStartTime + time.Duration(time.Minute*5).Nanoseconds(), Window: alignedStartTime + windowDur*5, Filled: true},
+		{Value: 5, Timestamp: baseDate.Add(time.Minute * 6).UnixNano(), Window: alignedStartTime + windowDur*6, Filled: false},
+		{Value: -1, Timestamp: alignedStartTime + time.Duration(time.Minute*7).Nanoseconds(), Window: alignedStartTime + windowDur*7, Filled: true},
+		{Value: -1, Timestamp: alignedStartTime + time.Duration(time.Minute*8).Nanoseconds(), Window: alignedStartTime + windowDur*8, Filled: true},
 	}, pts)
 }
 
