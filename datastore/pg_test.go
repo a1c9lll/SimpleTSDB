@@ -238,4 +238,148 @@ func TestWindowAggregator(t *testing.T) {
 		{Value: 1, Timestamp: baseTime.Add(time.Minute * 5).UnixNano(), Window: baseAlignedTime + windowDur, Filled: false},
 		{Value: 2, Timestamp: baseTime.Add(time.Minute * 10).UnixNano(), Window: baseAlignedTime + windowDur*2, Filled: false},
 	}, points)
+
+	// test fillValue absent and usePrevious true
+	points, err = QueryPoints(&core.PointsQuery{
+		Metric: "test1",
+		Tags: map[string]string{
+			"id": "1",
+		},
+		Start: baseTime.Add(-time.Minute * 5).UnixNano(),
+		Window: map[string]interface{}{
+			"every":           "5m",
+			"fillGaps":        true,
+			"fillUsePrevious": true,
+		},
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type val struct {
+		val    float64
+		filled bool
+		null   bool
+	}
+	vals := []*val{}
+	for _, pt := range points {
+		vals = append(vals, &val{
+			val:    pt.Value,
+			filled: pt.Filled,
+			null:   pt.Null,
+		})
+	}
+	require.Equal(t, []*val{
+		{-1, true, true},
+		{0, false, false},
+		{1, false, false},
+		{2, false, false},
+		{2, true, false},
+	}, vals)
+
+	// test with fillValue
+	points, err = QueryPoints(&core.PointsQuery{
+		Metric: "test1",
+		Tags: map[string]string{
+			"id": "1",
+		},
+		Start: baseTime.Add(-time.Minute * 5).UnixNano(),
+		Window: map[string]interface{}{
+			"every":     "5m",
+			"fillGaps":  true,
+			"fillValue": 999,
+		},
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vals = []*val{}
+	for _, pt := range points {
+		vals = append(vals, &val{
+			val:    pt.Value,
+			filled: pt.Filled,
+			null:   pt.Null,
+		})
+	}
+	require.Equal(t, []*val{
+		{999, true, false},
+		{0, false, false},
+		{1, false, false},
+		{2, false, false},
+		{999, true, false},
+	}, vals)
+
+	// test with fillValue and usePrevious
+	points, err = QueryPoints(&core.PointsQuery{
+		Metric: "test1",
+		Tags: map[string]string{
+			"id": "1",
+		},
+		Start: baseTime.Add(-time.Minute * 5).UnixNano(),
+		Window: map[string]interface{}{
+			"every":           "5m",
+			"fillGaps":        true,
+			"fillValue":       999,
+			"fillUsePrevious": true,
+		},
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vals = []*val{}
+	for _, pt := range points {
+		vals = append(vals, &val{
+			val:    pt.Value,
+			filled: pt.Filled,
+			null:   pt.Null,
+		})
+	}
+
+	require.Equal(t, []*val{
+		{999, true, false},
+		{0, false, false},
+		{1, false, false},
+		{2, false, false},
+		{2, true, false},
+	}, vals)
+
+	// test with usePrevious and no fill value
+	points, err = QueryPoints(&core.PointsQuery{
+		Metric: "test1",
+		Tags: map[string]string{
+			"id": "1",
+		},
+		Start: baseTime.Add(-time.Minute * 5).UnixNano(),
+		Window: map[string]interface{}{
+			"every":           "5m",
+			"fillGaps":        true,
+			"fillUsePrevious": true,
+		},
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vals = []*val{}
+	for _, pt := range points {
+		vals = append(vals, &val{
+			val:    pt.Value,
+			filled: pt.Filled,
+			null:   pt.Null,
+		})
+	}
+
+	require.Equal(t, []*val{
+		{-1, true, true},
+		{0, false, false},
+		{1, false, false},
+		{2, false, false},
+		{2, true, false},
+	}, vals)
 }

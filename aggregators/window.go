@@ -11,7 +11,6 @@ var (
 	errEveryRequired       = errors.New("'every' field is required for windowing")
 	errFillValueType       = errors.New("fillValue must be int or float")
 	errFillUsePreviousType = errors.New("fillUsePrevious must be boolean")
-	errFillValueRequired   = errors.New("fillValue is required for windowing")
 )
 
 func Window(startTime, endTime int64, options map[string]interface{}, points []*core.Point) ([]*core.Point, error) {
@@ -26,9 +25,11 @@ func Window(startTime, endTime int64, options map[string]interface{}, points []*
 	}
 
 	var (
-		fillGaps    bool
-		fillValue   = float64(-1)
-		usePrevious bool
+		fillGaps          bool
+		fillValue         = float64(-1)
+		usePrevious       bool
+		fillValueFound    bool
+		fillPreviousFound bool
 	)
 	if v, ok := options["fillGaps"]; ok {
 		switch v1 := v.(type) {
@@ -37,9 +38,6 @@ func Window(startTime, endTime int64, options map[string]interface{}, points []*
 		default:
 			return nil, errFillGapsType
 		}
-		var (
-			fillValueFound bool
-		)
 		if v2, ok := options["fillValue"]; ok {
 			switch v1 := v2.(type) {
 			case int:
@@ -64,10 +62,7 @@ func Window(startTime, endTime int64, options map[string]interface{}, points []*
 			default:
 				return nil, errFillUsePreviousType
 			}
-		}
-
-		if !fillValueFound {
-			return nil, errFillValueRequired
+			fillPreviousFound = true
 		}
 	}
 
@@ -108,6 +103,7 @@ func Window(startTime, endTime int64, options map[string]interface{}, points []*
 					Timestamp: windowTime,
 					Window:    windowTime,
 					Filled:    true,
+					Null:      (!fillValueFound && !fillPreviousFound) || (!fillValueFound && fillPreviousFound && currentPoint == 0),
 				})
 			}
 		}
