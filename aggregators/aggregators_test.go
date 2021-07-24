@@ -619,11 +619,7 @@ func TestMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pts, err = Mode(map[string]interface{}{}, pts)
-
-	if err != nil {
-		t.Fatal(err)
-	}
+	pts = Mode(pts)
 
 	type val struct {
 		val  float64

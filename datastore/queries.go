@@ -263,10 +263,7 @@ func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
 			if !windowApplied {
 				return nil, errWindowRequiredForMode
 			}
-			points, err = aggregators.Mode(aggregator.Options, points)
-			if err != nil {
-				return nil, err
-			}
+			points = aggregators.Mode(points)
 			windowedAggregatorApplied = true
 		case "stddev":
 			if !windowApplied {
