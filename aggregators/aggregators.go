@@ -13,6 +13,7 @@ import (
 
 var (
 	errCountFilledPointsType = errors.New("countFilledPoints must be boolean")
+	errNoModeValueType       = errors.New("noModeValue must be int or float")
 )
 
 func Last(points []*core.Point) []*core.Point {
@@ -481,4 +482,77 @@ func Sum(points []*core.Point) []*core.Point {
 	}
 
 	return summedPoints
+}
+
+func Mode(options map[string]interface{}, points []*core.Point) ([]*core.Point, error) {
+	var (
+		noModeValue    float64
+		useNoModeValue bool
+	)
+	if v, ok := options["noModeValue"]; ok {
+		switch v1 := v.(type) {
+		case float64:
+			noModeValue = v1
+		case float32:
+			noModeValue = float64(v1)
+		case int:
+			noModeValue = float64(v1)
+		case int32:
+			noModeValue = float64(v1)
+		case int64:
+			noModeValue = float64(v1)
+		default:
+			return nil, errNoModeValueType
+		}
+		useNoModeValue = true
+	}
+
+	buckets := Bucketize(points)
+	modePoints := make([]*core.Point, len(buckets))
+
+	for i, bucket := range buckets {
+		var (
+			modes  []*core.Point
+			mode   *core.Point
+			counts = map[float64]int{}
+			max    = -1
+		)
+		for _, n := range bucket {
+			count := 0
+			if v, ok := counts[n.Value]; ok {
+				count = v + 1
+			} else {
+				count = 1
+			}
+			counts[n.Value] = count
+
+			if count > max {
+				max = count
+				mode = n
+			}
+		}
+
+		for _, v := range counts {
+			if v > 1 {
+				modes = append(modes, mode)
+			}
+		}
+
+		if len(modes) == 0 || len(modes) > 1 {
+			modePoints[i] = &core.Point{
+				Value:     noModeValue,
+				Timestamp: bucket[0].Window,
+				Window:    bucket[0].Window,
+				Null:      !useNoModeValue,
+			}
+		} else {
+			modePoints[i] = &core.Point{
+				Value:     mode.Value,
+				Timestamp: mode.Window,
+				Window:    mode.Window,
+			}
+		}
+	}
+
+	return modePoints, nil
 }

@@ -594,3 +594,50 @@ func TestMedian(t *testing.T) {
 		25, 64, 1337,
 	}, vals)
 }
+
+func TestMode(t *testing.T) {
+	baseDate := time.Now()
+	pts := []*core.Point{
+		{Value: 11, Timestamp: baseDate.Add(-time.Minute * 3).UnixNano()},
+		{Value: 11, Timestamp: baseDate.Add(-time.Minute * 3).UnixNano()},
+		{Value: 30, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 1},
+		{Value: 10, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 2},
+		{Value: 98, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 3},
+		{Value: 73, Timestamp: baseDate.Add(-time.Minute*2).UnixNano() + 1},
+		{Value: 55, Timestamp: baseDate.Add(-time.Minute*2).UnixNano() + 2},
+		{Value: 999, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 1},
+		{Value: 1337, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 2},
+		{Value: 999, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 3},
+		{Value: 1337, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 4},
+	}
+
+	pts, err := Window(baseDate.Add(-time.Minute*3).UnixNano(), baseDate.Add(-time.Minute*1).UnixNano()+3, map[string]interface{}{
+		"every": "1m",
+	}, pts)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pts, err = Mode(map[string]interface{}{}, pts)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type val struct {
+		val  float64
+		null bool
+	}
+
+	vals := []*val{}
+	for _, pt := range pts {
+		vals = append(vals, &val{pt.Value, pt.Null})
+	}
+
+	require.Equal(t, []*val{
+		{val: 11, null: false},
+		{val: 0, null: true},
+		{val: 0, null: true},
+	}, vals)
+}

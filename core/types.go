@@ -5,6 +5,7 @@ type Point struct {
 	Timestamp int64   `json:"timestamp"`
 	Window    int64   `json:"-"`
 	Filled    bool    `json:"-"`
+	Null      bool    `json:"-"`
 }
 
 type InsertPointsQuery struct {

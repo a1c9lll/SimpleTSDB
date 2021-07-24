@@ -26,6 +26,7 @@ var (
 	errWindowRequiredForFirst  = errors.New("window must be set for first aggregator")
 	errWindowRequiredForLast   = errors.New("window must be set for last aggregator")
 	errWindowRequiredForMedian = errors.New("window must be set for median aggregator")
+	errWindowRequiredForMode   = errors.New("window must be set for mode aggregator")
 )
 
 func generateMetricQuery(name string, tags []string) (string, error) {
@@ -256,6 +257,15 @@ func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
 				return nil, errWindowRequiredForMedian
 			}
 			points = aggregators.Median(points)
+			windowedAggregatorApplied = true
+		case "mode":
+			if !windowApplied {
+				return nil, errWindowRequiredForMode
+			}
+			points, err = aggregators.Mode(aggregator.Options, points)
+			if err != nil {
+				return nil, err
+			}
 			windowedAggregatorApplied = true
 		}
 	}
