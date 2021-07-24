@@ -26,7 +26,7 @@ func Window(startTime, endTime int64, options map[string]interface{}, points []*
 
 	var (
 		fillGaps          bool
-		fillValue         = float64(-1)
+		fillValue         = float64(0)
 		usePrevious       bool
 		fillValueFound    bool
 		fillPreviousFound bool

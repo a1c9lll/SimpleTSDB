@@ -271,7 +271,7 @@ func TestWindowAggregator(t *testing.T) {
 		})
 	}
 	require.Equal(t, []*val{
-		{-1, true, true},
+		{0, true, true},
 		{0, false, false},
 		{1, false, false},
 		{2, false, false},
@@ -376,7 +376,7 @@ func TestWindowAggregator(t *testing.T) {
 	}
 
 	require.Equal(t, []*val{
-		{-1, true, true},
+		{0, true, true},
 		{0, false, false},
 		{1, false, false},
 		{2, false, false},
