@@ -18,6 +18,7 @@ func Min(points []*core.Point) []*core.Point {
 
 	min0 = points[0].Value
 	lastWindow = points[0].Window
+	total = 1
 
 	if len(points) > 1 {
 		for i := 1; i < len(points); i++ {

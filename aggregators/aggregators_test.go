@@ -243,3 +243,35 @@ func TestMax(t *testing.T) {
 		98, 73, 2940, -1,
 	}, vals)
 }
+
+func TestMax2(t *testing.T) {
+	baseDate := time.Now()
+	pts := []*core.Point{
+		{Value: 11, Timestamp: baseDate.Add(-time.Minute * 1).UnixNano()},
+	}
+
+	pts, err := Window(baseDate.Add(-time.Minute*1).UnixNano(), time.Now().UnixNano(), map[string]interface{}{
+		"every": "1m",
+	}, pts)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pts = Max(pts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vals := []float64{}
+	for _, pt := range pts {
+		if pt.Timestamp != pt.Window {
+			t.Fatal()
+		}
+		vals = append(vals, pt.Value)
+	}
+
+	require.Equal(t, []float64{
+		11,
+	}, vals)
+}
