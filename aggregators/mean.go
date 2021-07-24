@@ -2,7 +2,7 @@ package aggregators
 
 import "simpletsdb/core"
 
-func Average(points []*core.Point) []*core.Point {
+func Mean(points []*core.Point) []*core.Point {
 	if len(points) == 0 {
 		return points
 	}

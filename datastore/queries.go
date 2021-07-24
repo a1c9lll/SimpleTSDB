@@ -18,7 +18,7 @@ var (
 	errUnsupportedTagName     = errors.New("valid characters for tag names are a-z, A-Z, 0-9, and _")
 	errMetricRequired         = errors.New("metric is required")
 	errStartRequired          = errors.New("query start is required")
-	errWindowRequiredForAvg   = errors.New("window must be set for average aggregator")
+	errWindowRequiredForMean  = errors.New("window must be set for mean aggregator")
 	errWindowRequiredForSum   = errors.New("window must be set for sum aggregator")
 	errWindowRequiredForMin   = errors.New("window must be set for min aggregator")
 	errWindowRequiredForMax   = errors.New("window must be set for max aggregator")
@@ -205,11 +205,11 @@ func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
 
 	for _, aggregator := range query.Aggregators {
 		switch aggregator.Name {
-		case "average":
+		case "mean":
 			if !windowApplied {
-				return nil, errWindowRequiredForAvg
+				return nil, errWindowRequiredForMean
 			}
-			points = aggregators.Average(points)
+			points = aggregators.Mean(points)
 			windowedAggregatorApplied = true
 		case "sum":
 			if !windowApplied {

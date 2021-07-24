@@ -77,7 +77,7 @@ func TestWindowUsePrevious(t *testing.T) {
 	}, values)
 }
 
-func TestAverage(t *testing.T) {
+func TestMean(t *testing.T) {
 	baseDate := time.Now()
 	pts := []*core.Point{
 		{Value: 11, Timestamp: baseDate.Add(-time.Minute * 3).UnixNano()},
@@ -102,7 +102,7 @@ func TestAverage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pts = Average(pts)
+	pts = Mean(pts)
 
 	vals := []float64{}
 	for _, pt := range pts {
@@ -117,7 +117,7 @@ func TestAverage(t *testing.T) {
 	}, vals)
 }
 
-func TestAverage2(t *testing.T) {
+func TestMean2(t *testing.T) {
 	baseTime := time.Now().Add(-1 * time.Minute)
 	pts := []*core.Point{
 		{Value: 42, Timestamp: baseTime.Add(30 * time.Second).UnixNano()},
@@ -131,7 +131,7 @@ func TestAverage2(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pts = Average(pts)
+	pts = Mean(pts)
 
 	if len(pts) != 1 {
 		t.Fatal()
@@ -143,7 +143,7 @@ func TestAverage2(t *testing.T) {
 	}
 }
 
-func TestAverage3(t *testing.T) {
+func TestMean3(t *testing.T) {
 	baseTime := time.Now().Add(-time.Minute)
 	pts := []*core.Point{}
 
@@ -157,7 +157,7 @@ func TestAverage3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pts = Average(pts)
+	pts = Mean(pts)
 
 	if len(pts) != 1 {
 		t.Fatal()
