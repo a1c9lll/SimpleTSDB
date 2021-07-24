@@ -23,6 +23,8 @@ var (
 	errWindowRequiredForMin   = errors.New("window must be set for min aggregator")
 	errWindowRequiredForMax   = errors.New("window must be set for max aggregator")
 	errWindowRequiredForCount = errors.New("window must be set for count aggregator")
+	errWindowRequiredForFirst = errors.New("window must be set for first aggregator")
+	errWindowRequiredForLast  = errors.New("window must be set for last aggregator")
 )
 
 func generateMetricQuery(name string, tags []string) (string, error) {
@@ -235,6 +237,18 @@ func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
 			if err != nil {
 				return nil, err
 			}
+			windowedAggregatorApplied = true
+		case "first":
+			if !windowApplied {
+				return nil, errWindowRequiredForFirst
+			}
+			points = aggregators.First(points)
+			windowedAggregatorApplied = true
+		case "last":
+			if !windowApplied {
+				return nil, errWindowRequiredForLast
+			}
+			points = aggregators.Last(points)
 			windowedAggregatorApplied = true
 		}
 	}
