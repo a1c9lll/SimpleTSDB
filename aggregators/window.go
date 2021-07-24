@@ -7,9 +7,11 @@ import (
 )
 
 var (
-	errFillGapsType  = errors.New("fillGaps must be boolean")
-	errEveryRequired = errors.New("'every' field is required for windowing")
-	errFillValueType = errors.New("fillValue must be int or float")
+	errFillGapsType        = errors.New("fillGaps must be boolean")
+	errEveryRequired       = errors.New("'every' field is required for windowing")
+	errFillValueType       = errors.New("fillValue must be int or float")
+	errFillUsePreviousType = errors.New("fillUsePrevious must be boolean")
+	errFillValueRequired   = errors.New("fillValue is required for windowing")
 )
 
 func Window(startTime, endTime int64, options map[string]interface{}, points []*core.Point) ([]*core.Point, error) {
@@ -23,8 +25,11 @@ func Window(startTime, endTime int64, options map[string]interface{}, points []*
 		return nil, err
 	}
 
-	fillGaps := false
-	fillValue := float64(-1)
+	var (
+		fillGaps    bool
+		fillValue   = float64(-1)
+		usePrevious bool
+	)
 	if v, ok := options["fillGaps"]; ok {
 		switch v1 := v.(type) {
 		case bool:
@@ -32,6 +37,9 @@ func Window(startTime, endTime int64, options map[string]interface{}, points []*
 		default:
 			return nil, errFillGapsType
 		}
+		var (
+			fillValueFound bool
+		)
 		if v2, ok := options["fillValue"]; ok {
 			switch v1 := v2.(type) {
 			case int:
@@ -47,6 +55,19 @@ func Window(startTime, endTime int64, options map[string]interface{}, points []*
 			default:
 				return nil, errFillValueType
 			}
+			fillValueFound = true
+		}
+		if v3, ok := options["fillUsePrevious"]; ok {
+			switch v1 := v3.(type) {
+			case bool:
+				usePrevious = v1
+			default:
+				return nil, errFillUsePreviousType
+			}
+		}
+
+		if !fillValueFound {
+			return nil, errFillValueRequired
 		}
 	}
 
@@ -69,8 +90,21 @@ func Window(startTime, endTime int64, options map[string]interface{}, points []*
 				}
 			}
 			if !found {
+				var v float64
+				if usePrevious {
+					// fill value is used here if there is no previous value
+					// TODO: add query for filling previous value from
+					//       last value of previous time interval
+					if currentPoint > 0 {
+						v = points[currentPoint-1].Value
+					} else {
+						v = fillValue
+					}
+				} else {
+					v = fillValue
+				}
 				newPoints = append(newPoints, &core.Point{
-					Value:     fillValue,
+					Value:     v,
 					Timestamp: windowTime,
 					Window:    windowTime,
 					Filled:    true,

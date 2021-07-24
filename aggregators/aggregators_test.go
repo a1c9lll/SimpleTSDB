@@ -46,6 +46,37 @@ func TestWindow(t *testing.T) {
 	}, pts)
 }
 
+func TestWindowUsePrevious(t *testing.T) {
+	baseDate := time.Now()
+	pts := []*core.Point{
+		{Value: 1, Timestamp: baseDate.Add(-time.Minute).UnixNano()},
+		{Value: 2, Timestamp: baseDate.UnixNano()},
+		{Value: 3, Timestamp: baseDate.Add(time.Minute * 2).UnixNano()},
+		{Value: 4, Timestamp: baseDate.Add(time.Minute * 3).UnixNano()},
+		{Value: 5, Timestamp: baseDate.Add(time.Minute * 5).UnixNano()},
+		{Value: 6, Timestamp: baseDate.Add(time.Minute * 8).UnixNano()},
+	}
+
+	pts, err := Window(baseDate.Add(-2*time.Minute).UnixNano(), baseDate.Add(time.Minute*8).UnixNano(), map[string]interface{}{
+		"every":           "1m",
+		"fillGaps":        true,
+		"fillValue":       -1,
+		"fillUsePrevious": true,
+	}, pts)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	values := []float64{}
+	for _, pt := range pts {
+		values = append(values, pt.Value)
+	}
+
+	require.Equal(t, []float64{
+		-1, 1, 2, 2, 3, 4, 4, 5, 5, 5, 6,
+	}, values)
+}
+
 func TestAverage(t *testing.T) {
 	baseDate := time.Now()
 	pts := []*core.Point{
