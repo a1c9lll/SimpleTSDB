@@ -103,9 +103,6 @@ func TestAverage(t *testing.T) {
 	}
 
 	pts = Average(pts)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	vals := []float64{}
 	for _, pt := range pts {
@@ -201,9 +198,6 @@ func TestSum(t *testing.T) {
 	}
 
 	pts = Sum(pts)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	vals := []float64{}
 	for _, pt := range pts {
@@ -244,9 +238,6 @@ func TestMin(t *testing.T) {
 	}
 
 	pts = Min(pts)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	vals := []float64{}
 	for _, pt := range pts {
@@ -287,9 +278,6 @@ func TestMax(t *testing.T) {
 	}
 
 	pts = Max(pts)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	vals := []float64{}
 	for _, pt := range pts {
@@ -319,9 +307,6 @@ func TestMax2(t *testing.T) {
 	}
 
 	pts = Max(pts)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	vals := []float64{}
 	for _, pt := range pts {
@@ -356,6 +341,47 @@ func TestMax3(t *testing.T) {
 	}
 
 	pts = Max(pts)
+
+	vals := []float64{}
+	for _, pt := range pts {
+		if pt.Timestamp != pt.Window {
+			t.Fatal()
+		}
+		vals = append(vals, pt.Value)
+	}
+
+	require.Equal(t, []float64{
+		11, 12, -1, 13, 14,
+	}, vals)
+}
+
+func TestCount(t *testing.T) {
+	// test without counting filled points
+	baseDate := time.Now()
+	pts := []*core.Point{
+		{Value: 11, Timestamp: baseDate.Add(-time.Minute * 3).UnixNano()},
+		{Value: 25, Timestamp: baseDate.Add(-time.Minute * 3).UnixNano()},
+		{Value: 30, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 1},
+		{Value: 10, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 2},
+		{Value: 98, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 3},
+		{Value: 73, Timestamp: baseDate.Add(-time.Minute*2).UnixNano() + 1},
+		{Value: 55, Timestamp: baseDate.Add(-time.Minute*2).UnixNano() + 2},
+		{Value: 999, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 1},
+		{Value: 1337, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 2},
+		{Value: 2940, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 3},
+	}
+
+	pts, err := Window(baseDate.Add(-time.Minute*3).UnixNano(), time.Now().UnixNano(), map[string]interface{}{
+		"every":     "1m",
+		"fillGaps":  true,
+		"fillValue": -1,
+	}, pts)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pts, err = Count(map[string]interface{}{}, pts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,6 +395,49 @@ func TestMax3(t *testing.T) {
 	}
 
 	require.Equal(t, []float64{
-		11, 12, -1, 13, 14,
+		5, 2, 3, -1,
+	}, vals)
+
+	// test with counting filled points
+	pts = []*core.Point{
+		{Value: 11, Timestamp: baseDate.Add(-time.Minute * 3).UnixNano()},
+		{Value: 25, Timestamp: baseDate.Add(-time.Minute * 3).UnixNano()},
+		{Value: 30, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 1},
+		{Value: 10, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 2},
+		{Value: 98, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 3},
+		{Value: 73, Timestamp: baseDate.Add(-time.Minute*2).UnixNano() + 1},
+		{Value: 55, Timestamp: baseDate.Add(-time.Minute*2).UnixNano() + 2},
+		{Value: 999, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 1},
+		{Value: 1337, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 2},
+		{Value: 2940, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 3},
+	}
+
+	pts, err = Window(baseDate.Add(-time.Minute*3).UnixNano(), time.Now().UnixNano(), map[string]interface{}{
+		"every":     "1m",
+		"fillGaps":  true,
+		"fillValue": -1,
+	}, pts)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pts, err = Count(map[string]interface{}{
+		"countFilledPoints": true,
+	}, pts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vals = []float64{}
+	for _, pt := range pts {
+		if pt.Timestamp != pt.Window {
+			t.Fatal()
+		}
+		vals = append(vals, pt.Value)
+	}
+
+	require.Equal(t, []float64{
+		5, 2, 3, 1,
 	}, vals)
 }

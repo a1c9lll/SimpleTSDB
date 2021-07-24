@@ -13,15 +13,16 @@ import (
 )
 
 var (
-	metricAndTagsRe          = regexp.MustCompile("^[a-zA-Z0-9_]+$")
-	errUnsupportedMetricName = errors.New("valid characters for metrics are a-z, A-Z, 0-9, and _")
-	errUnsupportedTagName    = errors.New("valid characters for tag names are a-z, A-Z, 0-9, and _")
-	errMetricRequired        = errors.New("metric is required")
-	errStartRequired         = errors.New("query start is required")
-	errWindowRequiredForAvg  = errors.New("window must be set for average aggregator")
-	errWindowRequiredForSum  = errors.New("window must be set for sum aggregator")
-	errWindowRequiredForMin  = errors.New("window must be set for min aggregator")
-	errWindowRequiredForMax  = errors.New("window must be set for max aggregator")
+	metricAndTagsRe           = regexp.MustCompile("^[a-zA-Z0-9_]+$")
+	errUnsupportedMetricName  = errors.New("valid characters for metrics are a-z, A-Z, 0-9, and _")
+	errUnsupportedTagName     = errors.New("valid characters for tag names are a-z, A-Z, 0-9, and _")
+	errMetricRequired         = errors.New("metric is required")
+	errStartRequired          = errors.New("query start is required")
+	errWindowRequiredForAvg   = errors.New("window must be set for average aggregator")
+	errWindowRequiredForSum   = errors.New("window must be set for sum aggregator")
+	errWindowRequiredForMin   = errors.New("window must be set for min aggregator")
+	errWindowRequiredForMax   = errors.New("window must be set for max aggregator")
+	errWindowRequiredForCount = errors.New("window must be set for count aggregator")
 )
 
 func generateMetricQuery(name string, tags []string) (string, error) {
@@ -225,6 +226,15 @@ func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
 				return nil, errWindowRequiredForMax
 			}
 			points = aggregators.Max(points)
+			windowedAggregatorApplied = true
+		case "count":
+			if !windowApplied {
+				return nil, errWindowRequiredForCount
+			}
+			points, err = aggregators.Count(aggregator.Options, points)
+			if err != nil {
+				return nil, err
+			}
 			windowedAggregatorApplied = true
 		}
 	}
