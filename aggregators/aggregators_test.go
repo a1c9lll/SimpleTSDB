@@ -498,9 +498,7 @@ func TestLast(t *testing.T) {
 	}
 
 	pts, err := Window(baseDate.Add(-time.Minute*3).UnixNano(), baseDate.Add(-time.Minute*1).UnixNano()+3, map[string]interface{}{
-		"every":     "1m",
-		"fillGaps":  true,
-		"fillValue": -1,
+		"every": "1m",
 	}, pts)
 
 	if err != nil {
@@ -519,5 +517,80 @@ func TestLast(t *testing.T) {
 
 	require.Equal(t, []float64{
 		98, 55, 2940,
+	}, vals)
+}
+
+func TestBucketize(t *testing.T) {
+	baseDate := time.Now()
+	pts := []*core.Point{
+		{Value: 11, Timestamp: baseDate.Add(-time.Minute * 3).UnixNano()},
+		{Value: 25, Timestamp: baseDate.Add(-time.Minute * 3).UnixNano()},
+		{Value: 30, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 1},
+		{Value: 10, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 2},
+		{Value: 98, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 3},
+		{Value: 73, Timestamp: baseDate.Add(-time.Minute*2).UnixNano() + 1},
+		{Value: 55, Timestamp: baseDate.Add(-time.Minute*2).UnixNano() + 2},
+		{Value: 999, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 1},
+		{Value: 1337, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 2},
+		{Value: 2940, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 3},
+	}
+
+	pts, err := Window(baseDate.Add(-time.Minute*3).UnixNano(), baseDate.Add(-time.Minute*1).UnixNano()+3, map[string]interface{}{
+		"every": "1m",
+	}, pts)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	buckets := Bucketize(pts)
+
+	vals := [][]float64{}
+	for i, bucket := range buckets {
+		vals = append(vals, []float64{})
+		for _, pt := range bucket {
+			vals[i] = append(vals[i], pt.Value)
+		}
+	}
+
+	require.Equal(t, [][]float64{
+		{11, 25, 30, 10, 98},
+		{73, 55},
+		{999, 1337, 2940},
+	}, vals)
+}
+
+func TestMedian(t *testing.T) {
+	baseDate := time.Now()
+	pts := []*core.Point{
+		{Value: 11, Timestamp: baseDate.Add(-time.Minute * 3).UnixNano()},
+		{Value: 25, Timestamp: baseDate.Add(-time.Minute * 3).UnixNano()},
+		{Value: 30, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 1},
+		{Value: 10, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 2},
+		{Value: 98, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 3},
+		{Value: 73, Timestamp: baseDate.Add(-time.Minute*2).UnixNano() + 1},
+		{Value: 55, Timestamp: baseDate.Add(-time.Minute*2).UnixNano() + 2},
+		{Value: 999, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 1},
+		{Value: 1337, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 2},
+		{Value: 2940, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 3},
+	}
+
+	pts, err := Window(baseDate.Add(-time.Minute*3).UnixNano(), baseDate.Add(-time.Minute*1).UnixNano()+3, map[string]interface{}{
+		"every": "1m",
+	}, pts)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pts = Median(pts)
+
+	vals := []float64{}
+	for _, pt := range pts {
+		vals = append(vals, pt.Value)
+	}
+
+	require.Equal(t, []float64{
+		25, 64, 1337,
 	}, vals)
 }

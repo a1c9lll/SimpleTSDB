@@ -13,18 +13,19 @@ import (
 )
 
 var (
-	metricAndTagsRe           = regexp.MustCompile("^[a-zA-Z0-9_]+$")
-	errUnsupportedMetricName  = errors.New("valid characters for metrics are a-z, A-Z, 0-9, and _")
-	errUnsupportedTagName     = errors.New("valid characters for tag names are a-z, A-Z, 0-9, and _")
-	errMetricRequired         = errors.New("metric is required")
-	errStartRequired          = errors.New("query start is required")
-	errWindowRequiredForMean  = errors.New("window must be set for mean aggregator")
-	errWindowRequiredForSum   = errors.New("window must be set for sum aggregator")
-	errWindowRequiredForMin   = errors.New("window must be set for min aggregator")
-	errWindowRequiredForMax   = errors.New("window must be set for max aggregator")
-	errWindowRequiredForCount = errors.New("window must be set for count aggregator")
-	errWindowRequiredForFirst = errors.New("window must be set for first aggregator")
-	errWindowRequiredForLast  = errors.New("window must be set for last aggregator")
+	metricAndTagsRe            = regexp.MustCompile("^[a-zA-Z0-9_]+$")
+	errUnsupportedMetricName   = errors.New("valid characters for metrics are a-z, A-Z, 0-9, and _")
+	errUnsupportedTagName      = errors.New("valid characters for tag names are a-z, A-Z, 0-9, and _")
+	errMetricRequired          = errors.New("metric is required")
+	errStartRequired           = errors.New("query start is required")
+	errWindowRequiredForMean   = errors.New("window must be set for mean aggregator")
+	errWindowRequiredForSum    = errors.New("window must be set for sum aggregator")
+	errWindowRequiredForMin    = errors.New("window must be set for min aggregator")
+	errWindowRequiredForMax    = errors.New("window must be set for max aggregator")
+	errWindowRequiredForCount  = errors.New("window must be set for count aggregator")
+	errWindowRequiredForFirst  = errors.New("window must be set for first aggregator")
+	errWindowRequiredForLast   = errors.New("window must be set for last aggregator")
+	errWindowRequiredForMedian = errors.New("window must be set for median aggregator")
 )
 
 func generateMetricQuery(name string, tags []string) (string, error) {
@@ -249,6 +250,12 @@ func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
 				return nil, errWindowRequiredForLast
 			}
 			points = aggregators.Last(points)
+			windowedAggregatorApplied = true
+		case "median":
+			if !windowApplied {
+				return nil, errWindowRequiredForMedian
+			}
+			points = aggregators.Median(points)
 			windowedAggregatorApplied = true
 		}
 	}

@@ -180,7 +180,7 @@ func TestDuplicateInsert(t *testing.T) {
 	}
 	pts, err := QueryPoints(&core.PointsQuery{
 		Metric: "test2",
-		Start:  time.Now().Add(-time.Hour).Local().UnixNano(),
+		Start:  time.Now().Add(-time.Hour).UnixNano(),
 	})
 
 	if err != nil {
