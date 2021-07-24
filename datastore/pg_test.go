@@ -234,8 +234,8 @@ func TestWindowAggregator(t *testing.T) {
 	windowDur := time.Duration(time.Minute * 5).Nanoseconds()
 	baseAlignedTime := startTime - startTime%windowDur
 	require.Equal(t, []*core.Point{
-		{0, baseTime.UnixNano(), baseAlignedTime, false},
-		{1, baseTime.Add(time.Minute * 5).UnixNano(), baseAlignedTime + windowDur, false},
-		{2, baseTime.Add(time.Minute * 10).UnixNano(), baseAlignedTime + windowDur*2, false},
+		{Value: 0, Timestamp: baseTime.UnixNano(), Window: baseAlignedTime, Filled: false},
+		{Value: 1, Timestamp: baseTime.Add(time.Minute * 5).UnixNano(), Window: baseAlignedTime + windowDur, Filled: false},
+		{Value: 2, Timestamp: baseTime.Add(time.Minute * 10).UnixNano(), Window: baseAlignedTime + windowDur*2, Filled: false},
 	}, points)
 }
