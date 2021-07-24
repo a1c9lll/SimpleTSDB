@@ -13,17 +13,22 @@ import (
 )
 
 var (
-	metricAndTagsRe = regexp.MustCompile("^[a-zA-Z0-9_]+$")
+	metricAndTagsRe          = regexp.MustCompile("^[a-zA-Z0-9_]+$")
+	errUnsupportedMetricName = errors.New("valid characters for metrics are a-z, A-Z, 0-9, and _")
+	errUnsupportedTagName    = errors.New("valid characters for tag names are a-z, A-Z, 0-9, and _")
+	errMetricRequired        = errors.New("metric is required")
+	errStartRequired         = errors.New("query start is required")
+	errWindowRequiredForAvg  = errors.New("window must be set for average aggregator")
 )
 
 func generateMetricQuery(name string, tags []string) (string, error) {
 	if !metricAndTagsRe.MatchString(name) {
-		return "", errors.New("valid characters for metrics are a-z, A-Z, 0-9, and _")
+		return "", errUnsupportedMetricName
 	}
 	buf := &strings.Builder{}
 	for _, tag := range tags {
 		if !metricAndTagsRe.MatchString(tag) {
-			return "", errors.New("valid characters for tag names are a-z, A-Z, 0-9, and _")
+			return "", errUnsupportedTagName
 		}
 		buf.WriteString("x_" + tag + " text,")
 	}
@@ -75,7 +80,7 @@ func generatePointInsertionStringsAndValues(query *core.InsertPointsQuery) (stri
 	var i = 2
 	for k, v := range query.Tags {
 		if !metricAndTagsRe.MatchString(k) {
-			return "", "", nil, errors.New("valid characters for tag names are a-z, A-Z, 0-9, and _")
+			return "", "", nil, errUnsupportedTagName
 		}
 		tagsStrBuilder.WriteString("x_")
 		tagsStrBuilder.WriteString(k)
@@ -93,7 +98,7 @@ func generateTagsQueryString(tags map[string]string, queryVals []interface{}, ar
 	s := &strings.Builder{}
 	for k, v := range tags {
 		if !metricAndTagsRe.MatchString(k) {
-			return "", nil, 0, errors.New("valid characters for tag names are a-z, A-Z, 0-9, and _")
+			return "", nil, 0, errUnsupportedTagName
 		}
 		s.WriteString(fmt.Sprintf(" AND x_%s = $%s", k, strconv.Itoa(argsCounter+1)))
 		argsCounter++
@@ -103,8 +108,11 @@ func generateTagsQueryString(tags map[string]string, queryVals []interface{}, ar
 }
 
 func InsertPoint(query *core.InsertPointsQuery) error {
+	if query.Metric == "" {
+		return errMetricRequired
+	}
 	if !metricAndTagsRe.MatchString(query.Metric) {
-		return errors.New("valid characters for metrics are a-z, A-Z, 0-9, and _")
+		return errUnsupportedMetricName
 	}
 	tagsStr, valuesStr, values, err := generatePointInsertionStringsAndValues(query)
 	if err != nil {
@@ -120,14 +128,14 @@ func InsertPoint(query *core.InsertPointsQuery) error {
 
 func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
 	if query.Metric == "" {
-		return nil, errors.New("metric is required to query points")
+		return nil, errMetricRequired
 	}
 	if !metricAndTagsRe.MatchString(query.Metric) {
-		return nil, errors.New("valid characters for metrics are a-z, A-Z, 0-9, and _")
+		return nil, errUnsupportedMetricName
 	}
 
 	if query.Start == 0 {
-		return nil, errors.New("query start is required")
+		return nil, errStartRequired
 	}
 	if query.End == 0 {
 		query.End = time.Now().UnixNano()
@@ -192,7 +200,7 @@ func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
 		switch aggregator.Name {
 		case "average":
 			if !windowApplied {
-				return nil, errors.New("window must be set for average aggregator")
+				return nil, errWindowRequiredForAvg
 			}
 			points = aggregators.Average(points)
 		}

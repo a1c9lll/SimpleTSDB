@@ -36,7 +36,7 @@ func TestInvalidMetricName(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if err.Error() != "valid characters for metrics are a-z, A-Z, 0-9, and _" {
+	if err != errUnsupportedMetricName {
 		t.Fatalf("wrong error: %s", err)
 	}
 }
@@ -46,7 +46,7 @@ func TestInvalidTags(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if err.Error() != "valid characters for tag names are a-z, A-Z, 0-9, and _" {
+	if err != errUnsupportedTagName {
 		t.Fatalf("wrong error: %s", err)
 	}
 }
@@ -56,7 +56,7 @@ func TestInvalidMetricNameInInsertPoint(t *testing.T) {
 		Metric: " a b",
 	}); err == nil {
 		t.Fatal("expected error")
-	} else if err.Error() != "valid characters for metrics are a-z, A-Z, 0-9, and _" {
+	} else if err != errUnsupportedMetricName {
 		t.Fatalf("wrong error: %s", err)
 	}
 }
@@ -66,7 +66,21 @@ func TestInvalidMetricNameInQuery(t *testing.T) {
 		Metric: " a b",
 	}); err == nil {
 		t.Fatal("expected error")
-	} else if err.Error() != "valid characters for metrics are a-z, A-Z, 0-9, and _" {
+	} else if err != errUnsupportedMetricName {
+		t.Fatalf("wrong error: %s", err)
+	}
+}
+
+func TestMetricRequired(t *testing.T) {
+	if _, err := QueryPoints(&core.PointsQuery{}); err == nil {
+		t.Fatal("expected error")
+	} else if err != errMetricRequired {
+		t.Fatalf("wrong error: %s", err)
+	}
+
+	if err := InsertPoint(&core.InsertPointsQuery{}); err == nil {
+		t.Fatal("expected error")
+	} else if err != errMetricRequired {
 		t.Fatalf("wrong error: %s", err)
 	}
 }
