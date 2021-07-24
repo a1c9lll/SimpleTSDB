@@ -10,12 +10,13 @@ func Median(points []*core.Point) []*core.Point {
 		return points
 	}
 
-	medianPoints := []*core.Point{}
 	buckets := Bucketize(points)
-	for _, bucket := range buckets {
+	medianPoints := make([]*core.Point, len(buckets))
+
+	for i, bucket := range buckets {
 		pts := core.Points(bucket)
 		if pts[0].Filled {
-			medianPoints = append(medianPoints, pts[0])
+			medianPoints[i] = pts[0]
 			continue
 		}
 		sort.Sort(pts)
@@ -25,11 +26,11 @@ func Median(points []*core.Point) []*core.Point {
 		} else {
 			median = (pts[(len(pts)/2-1)].Value + pts[len(pts)/2].Value) / 2
 		}
-		medianPoints = append(medianPoints, &core.Point{
+		medianPoints[i] = &core.Point{
 			Value:     median,
 			Timestamp: pts[0].Window,
 			Window:    pts[0].Window,
-		})
+		}
 	}
 
 	return medianPoints
