@@ -114,3 +114,132 @@ func TestAverage2(t *testing.T) {
 		t.Fatal()
 	}
 }
+
+func TestSum(t *testing.T) {
+	baseDate := time.Now()
+	pts := []*core.Point{
+		{Value: 11, Timestamp: baseDate.Add(-time.Minute * 3).UnixNano()},
+		{Value: 25, Timestamp: baseDate.Add(-time.Minute * 3).UnixNano()},
+		{Value: 30, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 1},
+		{Value: 10, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 2},
+		{Value: 98, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 3},
+		{Value: 73, Timestamp: baseDate.Add(-time.Minute*2).UnixNano() + 1},
+		{Value: 55, Timestamp: baseDate.Add(-time.Minute*2).UnixNano() + 2},
+		{Value: 999, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 1},
+		{Value: 1337, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 2},
+		{Value: 2940, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 3},
+	}
+
+	pts, err := Window(baseDate.Add(-time.Minute*3).UnixNano(), time.Now().UnixNano(), map[string]interface{}{
+		"every":     "1m",
+		"fillGaps":  true,
+		"fillValue": -1,
+	}, pts)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pts = Sum(pts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vals := []float64{}
+	for _, pt := range pts {
+		if pt.Timestamp != pt.Window {
+			t.Fatal()
+		}
+		vals = append(vals, pt.Value)
+	}
+
+	require.Equal(t, []float64{
+		174, 128, 5276, -1,
+	}, vals)
+}
+
+func TestMin(t *testing.T) {
+	baseDate := time.Now()
+	pts := []*core.Point{
+		{Value: 11, Timestamp: baseDate.Add(-time.Minute * 3).UnixNano()},
+		{Value: 25, Timestamp: baseDate.Add(-time.Minute * 3).UnixNano()},
+		{Value: 30, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 1},
+		{Value: 10, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 2},
+		{Value: 98, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 3},
+		{Value: 73, Timestamp: baseDate.Add(-time.Minute*2).UnixNano() + 1},
+		{Value: 55, Timestamp: baseDate.Add(-time.Minute*2).UnixNano() + 2},
+		{Value: 999, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 1},
+		{Value: 1337, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 2},
+		{Value: 2940, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 3},
+	}
+
+	pts, err := Window(baseDate.Add(-time.Minute*3).UnixNano(), time.Now().UnixNano(), map[string]interface{}{
+		"every":     "1m",
+		"fillGaps":  true,
+		"fillValue": -1,
+	}, pts)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pts = Min(pts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vals := []float64{}
+	for _, pt := range pts {
+		if pt.Timestamp != pt.Window {
+			t.Fatal()
+		}
+		vals = append(vals, pt.Value)
+	}
+
+	require.Equal(t, []float64{
+		10, 55, 999, -1,
+	}, vals)
+}
+
+func TestMax(t *testing.T) {
+	baseDate := time.Now()
+	pts := []*core.Point{
+		{Value: 11, Timestamp: baseDate.Add(-time.Minute * 3).UnixNano()},
+		{Value: 25, Timestamp: baseDate.Add(-time.Minute * 3).UnixNano()},
+		{Value: 30, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 1},
+		{Value: 10, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 2},
+		{Value: 98, Timestamp: baseDate.Add(-time.Minute*3).UnixNano() + 3},
+		{Value: 73, Timestamp: baseDate.Add(-time.Minute*2).UnixNano() + 1},
+		{Value: 55, Timestamp: baseDate.Add(-time.Minute*2).UnixNano() + 2},
+		{Value: 999, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 1},
+		{Value: 1337, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 2},
+		{Value: 2940, Timestamp: baseDate.Add(-time.Minute*1).UnixNano() + 3},
+	}
+
+	pts, err := Window(baseDate.Add(-time.Minute*3).UnixNano(), time.Now().UnixNano(), map[string]interface{}{
+		"every":     "1m",
+		"fillGaps":  true,
+		"fillValue": -1,
+	}, pts)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pts = Max(pts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vals := []float64{}
+	for _, pt := range pts {
+		if pt.Timestamp != pt.Window {
+			t.Fatal()
+		}
+		vals = append(vals, pt.Value)
+	}
+
+	require.Equal(t, []float64{
+		98, 73, 2940, -1,
+	}, vals)
+}

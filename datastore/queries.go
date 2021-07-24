@@ -19,6 +19,9 @@ var (
 	errMetricRequired        = errors.New("metric is required")
 	errStartRequired         = errors.New("query start is required")
 	errWindowRequiredForAvg  = errors.New("window must be set for average aggregator")
+	errWindowRequiredForSum  = errors.New("window must be set for sum aggregator")
+	errWindowRequiredForMin  = errors.New("window must be set for min aggregator")
+	errWindowRequiredForMax  = errors.New("window must be set for max aggregator")
 )
 
 func generateMetricQuery(name string, tags []string) (string, error) {
@@ -185,7 +188,8 @@ func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
 	}
 
 	var (
-		windowApplied bool
+		windowApplied             bool
+		windowedAggregatorApplied bool
 	)
 
 	if query.Window != nil {
@@ -203,6 +207,33 @@ func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
 				return nil, errWindowRequiredForAvg
 			}
 			points = aggregators.Average(points)
+			windowedAggregatorApplied = true
+		case "sum":
+			if !windowApplied {
+				return nil, errWindowRequiredForSum
+			}
+			points = aggregators.Sum(points)
+			windowedAggregatorApplied = true
+		case "min":
+			if !windowApplied {
+				return nil, errWindowRequiredForMin
+			}
+			points = aggregators.Min(points)
+			windowedAggregatorApplied = true
+		case "max":
+			if !windowApplied {
+				return nil, errWindowRequiredForMax
+			}
+			points = aggregators.Max(points)
+			windowedAggregatorApplied = true
+		}
+	}
+
+	// Set windows to 0 if the points are window aggregated since all of the
+	// timestamps will be windows anyway
+	if windowedAggregatorApplied {
+		for _, pt := range points {
+			pt.Window = 0
 		}
 	}
 

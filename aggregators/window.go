@@ -6,9 +6,15 @@ import (
 	"time"
 )
 
+var (
+	errFillGapsType  = errors.New("fillGaps must be boolean")
+	errEveryRequired = errors.New("'every' field is required for windowing")
+	errFillValueType = errors.New("fillValue must be int or float")
+)
+
 func Window(startTime, endTime int64, options map[string]interface{}, points []*core.Point) ([]*core.Point, error) {
 	if _, ok := options["every"]; !ok {
-		return nil, errors.New("'every' field is required for windowing")
+		return nil, errEveryRequired
 	}
 
 	window, err := time.ParseDuration(options["every"].(string))
@@ -24,7 +30,7 @@ func Window(startTime, endTime int64, options map[string]interface{}, points []*
 		case bool:
 			fillGaps = v1
 		default:
-			return nil, errors.New("fillGaps must be boolean")
+			return nil, errFillGapsType
 		}
 		if v2, ok := options["fillValue"]; ok {
 			switch v1 := v2.(type) {
@@ -39,7 +45,7 @@ func Window(startTime, endTime int64, options map[string]interface{}, points []*
 			case float64:
 				fillValue = v1
 			default:
-				return nil, errors.New("fillValue must be int or float")
+				return nil, errFillValueType
 			}
 		}
 	}
