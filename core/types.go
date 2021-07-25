@@ -4,7 +4,6 @@ type Point struct {
 	Value     float64 `json:"value"`
 	Timestamp int64   `json:"timestamp"`
 	Window    int64   `json:"-"`
-	Filled    bool    `json:"-"`
 	Null      bool    `json:"-"`
 }
 

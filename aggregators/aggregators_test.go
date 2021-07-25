@@ -33,16 +33,16 @@ func TestWindow(t *testing.T) {
 	alignedStartTime := baseTimeNano - baseTimeNano%windowDur
 
 	require.Equal(t, []*core.Point{
-		{Value: 0, Null: true, Timestamp: baseTime.Add(-time.Minute).UnixNano(), Window: alignedStartTime - windowDur, Filled: true},
-		{Value: 1, Timestamp: baseTime.UnixNano(), Window: alignedStartTime, Filled: false},
-		{Value: 2, Timestamp: baseTime.Add(time.Minute).UnixNano(), Window: alignedStartTime + windowDur, Filled: false},
-		{Value: 0, Null: true, Timestamp: alignedStartTime + time.Duration(time.Minute*2).Nanoseconds(), Window: alignedStartTime + windowDur*2, Filled: true},
-		{Value: 3, Timestamp: baseTime.Add(time.Minute * 3).UnixNano(), Window: alignedStartTime + windowDur*3, Filled: false},
-		{Value: 4, Timestamp: baseTime.Add(time.Minute * 4).UnixNano(), Window: alignedStartTime + windowDur*4, Filled: false},
-		{Value: 0, Null: true, Timestamp: alignedStartTime + time.Duration(time.Minute*5).Nanoseconds(), Window: alignedStartTime + windowDur*5, Filled: true},
-		{Value: 5, Timestamp: baseTime.Add(time.Minute * 6).UnixNano(), Window: alignedStartTime + windowDur*6, Filled: false},
-		{Value: 0, Null: true, Timestamp: alignedStartTime + time.Duration(time.Minute*7).Nanoseconds(), Window: alignedStartTime + windowDur*7, Filled: true},
-		{Value: 0, Null: true, Timestamp: alignedStartTime + time.Duration(time.Minute*8).Nanoseconds(), Window: alignedStartTime + windowDur*8, Filled: true},
+		{Value: 0, Null: true, Timestamp: baseTime.Add(-time.Minute).UnixNano(), Window: alignedStartTime - windowDur},
+		{Value: 1, Timestamp: baseTime.UnixNano(), Window: alignedStartTime},
+		{Value: 2, Timestamp: baseTime.Add(time.Minute).UnixNano(), Window: alignedStartTime + windowDur},
+		{Value: 0, Null: true, Timestamp: alignedStartTime + time.Duration(time.Minute*2).Nanoseconds(), Window: alignedStartTime + windowDur*2},
+		{Value: 3, Timestamp: baseTime.Add(time.Minute * 3).UnixNano(), Window: alignedStartTime + windowDur*3},
+		{Value: 4, Timestamp: baseTime.Add(time.Minute * 4).UnixNano(), Window: alignedStartTime + windowDur*4},
+		{Value: 0, Null: true, Timestamp: alignedStartTime + time.Duration(time.Minute*5).Nanoseconds(), Window: alignedStartTime + windowDur*5},
+		{Value: 5, Timestamp: baseTime.Add(time.Minute * 6).UnixNano(), Window: alignedStartTime + windowDur*6},
+		{Value: 0, Null: true, Timestamp: alignedStartTime + time.Duration(time.Minute*7).Nanoseconds(), Window: alignedStartTime + windowDur*7},
+		{Value: 0, Null: true, Timestamp: alignedStartTime + time.Duration(time.Minute*8).Nanoseconds(), Window: alignedStartTime + windowDur*8},
 	}, pts)
 
 }
@@ -131,7 +131,7 @@ func TestMean3(t *testing.T) {
 		t.Fatal()
 	}
 
-	if !pts[0].Filled {
+	if !pts[0].Null {
 		t.Fatal()
 	}
 
@@ -320,7 +320,7 @@ func TestMax3(t *testing.T) {
 }
 
 func TestCount(t *testing.T) {
-	// test without counting filled points
+	// test without counting null points
 	baseTime := util.MustParseTime("2000-01-01T00:00:00Z")
 	pts := []*core.Point{
 		{Value: 11, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
@@ -361,7 +361,7 @@ func TestCount(t *testing.T) {
 		5, 2, 3, 0,
 	}, vals)
 
-	// test with counting filled points
+	// test with counting null points
 	pts = []*core.Point{
 		{Value: 11, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 25, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
@@ -385,7 +385,7 @@ func TestCount(t *testing.T) {
 	}
 
 	pts, err = Count(map[string]interface{}{
-		"countFilledPoints": true,
+		"countNullPoints": true,
 	}, pts)
 	if err != nil {
 		t.Fatal(err)

@@ -68,7 +68,6 @@ func Window(startTime, endTime int64, options map[string]interface{}, points []*
 					Value:     0,
 					Timestamp: windowTime,
 					Window:    windowTime,
-					Filled:    true,
 					Null:      true,
 				})
 			}
