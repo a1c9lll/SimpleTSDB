@@ -7,7 +7,7 @@ type Point struct {
 	Null      bool    `json:"-"`
 }
 
-type InsertPointsQuery struct {
+type InsertPointQuery struct {
 	Metric string            `json:"metric"`
 	Tags   map[string]string `json:"tags"`
 	Point  *Point            `json:"point"`

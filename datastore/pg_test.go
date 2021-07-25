@@ -52,7 +52,7 @@ func TestInvalidTags(t *testing.T) {
 }
 
 func TestInvalidMetricNameInInsertPoint(t *testing.T) {
-	if err := InsertPoint(&core.InsertPointsQuery{
+	if err := InsertPoint(&core.InsertPointQuery{
 		Metric: " a b",
 	}); err == nil {
 		t.Fatal("expected error")
@@ -78,7 +78,7 @@ func TestMetricRequired(t *testing.T) {
 		t.Fatalf("wrong error: %s", err)
 	}
 
-	if err := InsertPoint(&core.InsertPointsQuery{}); err == nil {
+	if err := InsertPoint(&core.InsertPointQuery{}); err == nil {
 		t.Fatal("expected error")
 	} else if err != errMetricRequired {
 		t.Fatalf("wrong error: %s", err)
@@ -96,7 +96,7 @@ func TestMetricExists(t *testing.T) {
 }
 
 func TestInsertPointAndQuery(t *testing.T) {
-	for _, pt := range []*core.InsertPointsQuery{
+	for _, pt := range []*core.InsertPointQuery{
 		{
 			Metric: "test0",
 			Tags: map[string]string{
@@ -160,7 +160,7 @@ func TestDuplicateInsert(t *testing.T) {
 		t.Fatal(err)
 	}
 	timestamp := time.Now().UnixNano()
-	if err := InsertPoint(&core.InsertPointsQuery{
+	if err := InsertPoint(&core.InsertPointQuery{
 		Metric: "test2",
 		Point: &core.Point{
 			Value:     182599002,
@@ -169,7 +169,7 @@ func TestDuplicateInsert(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := InsertPoint(&core.InsertPointsQuery{
+	if err := InsertPoint(&core.InsertPointQuery{
 		Metric: "test2",
 		Point: &core.Point{
 			Value:     182599002,
@@ -200,7 +200,7 @@ func TestWindowAggregator(t *testing.T) {
 
 	baseTime := time.Now().Add(-time.Minute * 15)
 	for i := 0; i < 3; i++ {
-		err := InsertPoint(&core.InsertPointsQuery{
+		err := InsertPoint(&core.InsertPointQuery{
 			Metric: "test1",
 			Tags: map[string]string{
 				"id": "1",

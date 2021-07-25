@@ -83,7 +83,7 @@ func MetricExists(name string) (bool, error) {
 	return found, nil
 }
 
-func generatePointInsertionStringsAndValues(query *core.InsertPointsQuery) (string, string, []interface{}, error) {
+func generatePointInsertionStringsAndValues(query *core.InsertPointQuery) (string, string, []interface{}, error) {
 	tagsStrBuilder, valuesStrBuilder := &strings.Builder{}, &strings.Builder{}
 	values := []interface{}{query.Point.Timestamp}
 
@@ -117,7 +117,7 @@ func generateTagsQueryString(tags map[string]string, queryVals []interface{}, ar
 	return s.String(), queryVals, argsCounter - 1, nil
 }
 
-func InsertPoint(query *core.InsertPointsQuery) error {
+func InsertPoint(query *core.InsertPointQuery) error {
 	if query.Metric == "" {
 		return errMetricRequired
 	}
@@ -131,6 +131,21 @@ func InsertPoint(query *core.InsertPointsQuery) error {
 	queryStr := fmt.Sprintf(`INSERT INTO simpletsdb_%s (timestamp,%svalue) VALUES ($1,%s$%d)`, query.Metric, tagsStr, valuesStr, len(values))
 	if _, err = session.Query(queryStr, values...); err != nil && err.Error() != fmt.Sprintf(errStringDuplicate, query.Metric) {
 		return err
+	}
+
+	return nil
+}
+
+// This function just calls single inserts for each point.
+// TODO: Batch the inserts if possible. Although it may be
+//       difficult to keep the insert order with multiple different
+//       metrics being inserted.
+func InsertPoints(queries []*core.InsertPointQuery) error {
+	for _, query := range queries {
+		err := InsertPoint(query)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

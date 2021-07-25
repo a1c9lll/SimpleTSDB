@@ -14,7 +14,7 @@ var (
 	errInvalidSyntax = errors.New("parse line: invalid line protocol syntax")
 )
 
-func ParseLine(line string) (*core.InsertPointsQuery, error) {
+func ParseLine(line string) (*core.InsertPointQuery, error) {
 	strs := lineMatchRe.FindAllStringSubmatch(line, -1)
 	if len(strs) != 1 {
 		return nil, errNoMatches
@@ -30,7 +30,11 @@ func ParseLine(line string) (*core.InsertPointsQuery, error) {
 
 	tagsStrs := strings.Split(match[2], " ")
 	tags := map[string]string{}
+
 	for _, s := range tagsStrs {
+		if s == "" {
+			break
+		}
 		s0 := strings.Split(s, "=")
 		key := strings.Trim(s0[0], " \t")
 		val := strings.Trim(s0[1], " \t")
@@ -47,7 +51,7 @@ func ParseLine(line string) (*core.InsertPointsQuery, error) {
 		return nil, err
 	}
 
-	return &core.InsertPointsQuery{
+	return &core.InsertPointQuery{
 		Metric: metric,
 		Tags:   tags,
 		Point: &core.Point{
