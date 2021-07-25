@@ -11,6 +11,9 @@ var (
 	errCountFilledPointsType = errors.New("countFilledPoints must be boolean")
 	errStdDevOptionInvalid   = errors.New("valid options for stddev mode are population and sample")
 	errStdDevModeType        = errors.New("stddev mode must be string")
+	errFillValueRequired     = errors.New("fillValue must be set for fill aggregator")
+	errUsePreviousType       = errors.New("usePrevious must be boolean")
+	errFillValueType         = errors.New("fillValue must be int or float")
 )
 
 func Last(points []*core.Point) []*core.Point {
@@ -601,4 +604,66 @@ func StdDev(options map[string]interface{}, points []*core.Point) ([]*core.Point
 	}
 
 	return stdDevedPoints, nil
+}
+
+// fillValue is required even if usePrevious is set incase
+// the first point is null
+func Fill(options map[string]interface{}, points []*core.Point) ([]*core.Point, error) {
+	if len(points) == 0 {
+		return points, nil
+	}
+
+	var (
+		usePrevious bool
+		fillValue   = float64(-1)
+	)
+
+	if v, ok := options["usePrevious"]; ok {
+		switch v1 := v.(type) {
+		case bool:
+			usePrevious = v1
+		default:
+			return nil, errUsePreviousType
+		}
+	}
+
+	if v, ok := options["fillValue"]; ok {
+		switch v1 := v.(type) {
+		case int:
+			fillValue = float64(v1)
+		case int32:
+			fillValue = float64(v1)
+		case int64:
+			fillValue = float64(v1)
+		case float32:
+			fillValue = float64(v1)
+		case float64:
+			fillValue = v1
+		default:
+			return nil, errFillValueType
+		}
+	} else {
+		return nil, errFillValueRequired
+	}
+
+	if points[0].Null {
+		points[0].Value = fillValue
+		points[0].Null = false
+	}
+
+	if len(points) > 1 {
+		for i := 1; i < len(points); i++ {
+			pt := points[i]
+			if pt.Null {
+				if usePrevious {
+					pt.Value = points[i-1].Value
+				} else {
+					pt.Value = fillValue
+				}
+				pt.Null = false
+			}
+		}
+	}
+
+	return points, nil
 }

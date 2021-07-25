@@ -7,10 +7,9 @@ import (
 )
 
 var (
-	errFillGapsType        = errors.New("fillGaps must be boolean")
-	errEveryRequired       = errors.New("'every' field is required for windowing")
-	errFillValueType       = errors.New("fillValue must be int or float")
-	errFillUsePreviousType = errors.New("fillUsePrevious must be boolean")
+	errCreateEmptyType = errors.New("createEmpty must be boolean")
+	errEveryType       = errors.New("every must be boolean in window aggregator")
+	errEveryRequired   = errors.New("every field is required in window aggregator")
 )
 
 func Window(startTime, endTime int64, options map[string]interface{}, points []*core.Point) ([]*core.Point, error) {
@@ -18,56 +17,36 @@ func Window(startTime, endTime int64, options map[string]interface{}, points []*
 		return nil, errEveryRequired
 	}
 
-	window, err := time.ParseDuration(options["every"].(string))
+	var (
+		window time.Duration
+		err    error
+	)
+	switch v1 := options["every"].(type) {
+	case string:
+		window, err = time.ParseDuration(v1)
 
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errEveryType
 	}
 
 	var (
-		fillGaps          bool
-		fillValue         = float64(0)
-		usePrevious       bool
-		fillValueFound    bool
-		fillPreviousFound bool
+		createEmpty bool
 	)
-	if v, ok := options["fillGaps"]; ok {
+
+	if v, ok := options["createEmpty"]; ok {
 		switch v1 := v.(type) {
 		case bool:
-			fillGaps = v1
+			createEmpty = v1
 		default:
-			return nil, errFillGapsType
-		}
-		if v2, ok := options["fillValue"]; ok {
-			switch v1 := v2.(type) {
-			case int:
-				fillValue = float64(v1)
-			case int32:
-				fillValue = float64(v1)
-			case int64:
-				fillValue = float64(v1)
-			case float32:
-				fillValue = float64(v1)
-			case float64:
-				fillValue = v1
-			default:
-				return nil, errFillValueType
-			}
-			fillValueFound = true
-		}
-		if v3, ok := options["fillUsePrevious"]; ok {
-			switch v1 := v3.(type) {
-			case bool:
-				usePrevious = v1
-			default:
-				return nil, errFillUsePreviousType
-			}
-			fillPreviousFound = true
+			return nil, errCreateEmptyType
 		}
 	}
 
 	// We create a new slice of points if we're filling gaps
-	if fillGaps {
+	if createEmpty {
 		newPoints := []*core.Point{}
 		windowDur := window.Nanoseconds()
 		currentPoint := 0
@@ -85,25 +64,12 @@ func Window(startTime, endTime int64, options map[string]interface{}, points []*
 				}
 			}
 			if !found {
-				var v float64
-				if usePrevious {
-					// fill value is used here if there is no previous value
-					// TODO: add query for filling previous value from
-					//       last value of previous time interval
-					if currentPoint > 0 {
-						v = points[currentPoint-1].Value
-					} else {
-						v = fillValue
-					}
-				} else {
-					v = fillValue
-				}
 				newPoints = append(newPoints, &core.Point{
-					Value:     v,
+					Value:     0,
 					Timestamp: windowTime,
 					Window:    windowTime,
 					Filled:    true,
-					Null:      (!fillValueFound && !fillPreviousFound) || (!fillValueFound && fillPreviousFound && currentPoint == 0),
+					Null:      true,
 				})
 			}
 		}

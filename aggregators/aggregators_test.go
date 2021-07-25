@@ -19,9 +19,8 @@ func TestWindow(t *testing.T) {
 	}
 
 	pts, err := Window(baseDate.Add(-time.Minute).UnixNano(), baseDate.Add(time.Minute*8).UnixNano(), map[string]interface{}{
-		"every":     "1m",
-		"fillGaps":  true,
-		"fillValue": -1,
+		"every":       "1m",
+		"createEmpty": true,
 	}, pts)
 
 	if err != nil {
@@ -33,48 +32,17 @@ func TestWindow(t *testing.T) {
 	alignedStartTime := baseTime - baseTime%windowDur
 
 	require.Equal(t, []*core.Point{
-		{Value: -1, Timestamp: alignedStartTime - time.Duration(time.Minute).Nanoseconds(), Window: alignedStartTime - windowDur, Filled: true},
+		{Value: 0, Null: true, Timestamp: alignedStartTime - time.Duration(time.Minute).Nanoseconds(), Window: alignedStartTime - windowDur, Filled: true},
 		{Value: 1, Timestamp: baseDate.UnixNano(), Window: alignedStartTime, Filled: false},
 		{Value: 2, Timestamp: baseDate.Add(time.Minute).UnixNano(), Window: alignedStartTime + windowDur, Filled: false},
-		{Value: -1, Timestamp: alignedStartTime + time.Duration(time.Minute*2).Nanoseconds(), Window: alignedStartTime + windowDur*2, Filled: true},
+		{Value: 0, Null: true, Timestamp: alignedStartTime + time.Duration(time.Minute*2).Nanoseconds(), Window: alignedStartTime + windowDur*2, Filled: true},
 		{Value: 3, Timestamp: baseDate.Add(time.Minute * 3).UnixNano(), Window: alignedStartTime + windowDur*3, Filled: false},
 		{Value: 4, Timestamp: baseDate.Add(time.Minute * 4).UnixNano(), Window: alignedStartTime + windowDur*4, Filled: false},
-		{Value: -1, Timestamp: alignedStartTime + time.Duration(time.Minute*5).Nanoseconds(), Window: alignedStartTime + windowDur*5, Filled: true},
+		{Value: 0, Null: true, Timestamp: alignedStartTime + time.Duration(time.Minute*5).Nanoseconds(), Window: alignedStartTime + windowDur*5, Filled: true},
 		{Value: 5, Timestamp: baseDate.Add(time.Minute * 6).UnixNano(), Window: alignedStartTime + windowDur*6, Filled: false},
-		{Value: -1, Timestamp: alignedStartTime + time.Duration(time.Minute*7).Nanoseconds(), Window: alignedStartTime + windowDur*7, Filled: true},
-		{Value: -1, Timestamp: alignedStartTime + time.Duration(time.Minute*8).Nanoseconds(), Window: alignedStartTime + windowDur*8, Filled: true},
+		{Value: 0, Null: true, Timestamp: alignedStartTime + time.Duration(time.Minute*7).Nanoseconds(), Window: alignedStartTime + windowDur*7, Filled: true},
+		{Value: 0, Null: true, Timestamp: alignedStartTime + time.Duration(time.Minute*8).Nanoseconds(), Window: alignedStartTime + windowDur*8, Filled: true},
 	}, pts)
-}
-
-func TestWindowUsePrevious(t *testing.T) {
-	baseDate := time.Now()
-	pts := []*core.Point{
-		{Value: 1, Timestamp: baseDate.Add(-time.Minute).UnixNano()},
-		{Value: 2, Timestamp: baseDate.UnixNano()},
-		{Value: 3, Timestamp: baseDate.Add(time.Minute * 2).UnixNano()},
-		{Value: 4, Timestamp: baseDate.Add(time.Minute * 3).UnixNano()},
-		{Value: 5, Timestamp: baseDate.Add(time.Minute * 5).UnixNano()},
-		{Value: 6, Timestamp: baseDate.Add(time.Minute * 8).UnixNano()},
-	}
-
-	pts, err := Window(baseDate.Add(-2*time.Minute).UnixNano(), baseDate.Add(time.Minute*8).UnixNano(), map[string]interface{}{
-		"every":           "1m",
-		"fillGaps":        true,
-		"fillValue":       -1,
-		"fillUsePrevious": true,
-	}, pts)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-	values := []float64{}
-	for _, pt := range pts {
-		values = append(values, pt.Value)
-	}
-
-	require.Equal(t, []float64{
-		-1, 1, 2, 2, 3, 4, 4, 5, 5, 5, 6,
-	}, values)
 }
 
 func TestMean(t *testing.T) {
@@ -93,9 +61,8 @@ func TestMean(t *testing.T) {
 	}
 
 	pts, err := Window(baseDate.Add(-time.Minute*3).UnixNano(), time.Now().UnixNano(), map[string]interface{}{
-		"every":     "1m",
-		"fillGaps":  true,
-		"fillValue": -1,
+		"every":       "1m",
+		"createEmpty": true,
 	}, pts)
 
 	if err != nil {
@@ -113,7 +80,7 @@ func TestMean(t *testing.T) {
 	}
 
 	require.Equal(t, []float64{
-		34.8, 64, 1758.6666666666667, -1,
+		34.8, 64, 1758.6666666666667, 0,
 	}, vals)
 }
 
@@ -148,9 +115,8 @@ func TestMean3(t *testing.T) {
 	pts := []*core.Point{}
 
 	pts, err := Window(baseTime.UnixNano(), baseTime.UnixNano(), map[string]interface{}{
-		"every":     "1m",
-		"fillGaps":  true,
-		"fillValue": -1,
+		"every":       "1m",
+		"createEmpty": true,
 	}, pts)
 
 	if err != nil {
@@ -188,9 +154,8 @@ func TestSum(t *testing.T) {
 	}
 
 	pts, err := Window(baseDate.Add(-time.Minute*3).UnixNano(), time.Now().UnixNano(), map[string]interface{}{
-		"every":     "1m",
-		"fillGaps":  true,
-		"fillValue": -1,
+		"every":       "1m",
+		"createEmpty": true,
 	}, pts)
 
 	if err != nil {
@@ -208,7 +173,7 @@ func TestSum(t *testing.T) {
 	}
 
 	require.Equal(t, []float64{
-		174, 128, 5276, -1,
+		174, 128, 5276, 0,
 	}, vals)
 }
 
@@ -228,9 +193,8 @@ func TestMin(t *testing.T) {
 	}
 
 	pts, err := Window(baseDate.Add(-time.Minute*3).UnixNano(), time.Now().UnixNano(), map[string]interface{}{
-		"every":     "1m",
-		"fillGaps":  true,
-		"fillValue": -1,
+		"every":       "1m",
+		"createEmpty": true,
 	}, pts)
 
 	if err != nil {
@@ -248,7 +212,7 @@ func TestMin(t *testing.T) {
 	}
 
 	require.Equal(t, []float64{
-		10, 55, 999, -1,
+		10, 55, 999, 0,
 	}, vals)
 }
 
@@ -268,9 +232,8 @@ func TestMax(t *testing.T) {
 	}
 
 	pts, err := Window(baseDate.Add(-time.Minute*3).UnixNano(), time.Now().UnixNano(), map[string]interface{}{
-		"every":     "1m",
-		"fillGaps":  true,
-		"fillValue": -1,
+		"every":       "1m",
+		"createEmpty": true,
 	}, pts)
 
 	if err != nil {
@@ -288,7 +251,7 @@ func TestMax(t *testing.T) {
 	}
 
 	require.Equal(t, []float64{
-		98, 73, 2940, -1,
+		98, 73, 2940, 0,
 	}, vals)
 }
 
@@ -331,9 +294,8 @@ func TestMax3(t *testing.T) {
 	}
 
 	pts, err := Window(baseDate.Add(-time.Minute*4).UnixNano(), time.Now().UnixNano(), map[string]interface{}{
-		"every":     "1m",
-		"fillGaps":  true,
-		"fillValue": -1,
+		"every":       "1m",
+		"createEmpty": true,
 	}, pts)
 
 	if err != nil {
@@ -351,7 +313,7 @@ func TestMax3(t *testing.T) {
 	}
 
 	require.Equal(t, []float64{
-		11, 12, -1, 13, 14,
+		11, 12, 0, 13, 14,
 	}, vals)
 }
 
@@ -372,9 +334,8 @@ func TestCount(t *testing.T) {
 	}
 
 	pts, err := Window(baseDate.Add(-time.Minute*3).UnixNano(), time.Now().UnixNano(), map[string]interface{}{
-		"every":     "1m",
-		"fillGaps":  true,
-		"fillValue": -1,
+		"every":       "1m",
+		"createEmpty": true,
 	}, pts)
 
 	if err != nil {
@@ -395,7 +356,7 @@ func TestCount(t *testing.T) {
 	}
 
 	require.Equal(t, []float64{
-		5, 2, 3, -1,
+		5, 2, 3, 0,
 	}, vals)
 
 	// test with counting filled points
@@ -413,9 +374,8 @@ func TestCount(t *testing.T) {
 	}
 
 	pts, err = Window(baseDate.Add(-time.Minute*3).UnixNano(), time.Now().UnixNano(), map[string]interface{}{
-		"every":     "1m",
-		"fillGaps":  true,
-		"fillValue": -1,
+		"every":       "1m",
+		"createEmpty": true,
 	}, pts)
 
 	if err != nil {
@@ -458,9 +418,8 @@ func TestFirst(t *testing.T) {
 	}
 
 	pts, err := Window(baseDate.Add(-time.Minute*3).UnixNano(), baseDate.Add(-time.Minute*1).UnixNano()+3, map[string]interface{}{
-		"every":     "1m",
-		"fillGaps":  true,
-		"fillValue": -1,
+		"every":       "1m",
+		"createEmpty": true,
 	}, pts)
 
 	if err != nil {
@@ -742,4 +701,78 @@ func TestStdDev(t *testing.T) {
 	if !pts[0].Null {
 		t.Fatal()
 	}
+}
+
+func TestFill(t *testing.T) {
+	pts := []*core.Point{}
+
+	baseTime := time.Now()
+	pts, err := Window(baseTime.Add(-time.Second*30).UnixNano(), baseTime.UnixNano(), map[string]interface{}{
+		"every":       "5s",
+		"createEmpty": true,
+	}, pts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pts, err = Fill(map[string]interface{}{
+		"fillValue": -1,
+	}, pts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type val struct {
+		val  float64
+		null bool
+	}
+	vals := []*val{}
+	for _, pt := range pts {
+		vals = append(vals, &val{pt.Value, pt.Null})
+	}
+	require.Equal(t, []*val{
+		{val: -1, null: false},
+		{val: -1, null: false},
+		{val: -1, null: false},
+		{val: -1, null: false},
+		{val: -1, null: false},
+		{val: -1, null: false},
+		{val: -1, null: false},
+	}, vals)
+
+	// with usePrevious
+	pts = []*core.Point{
+		{Value: 42, Timestamp: baseTime.Add(-time.Second * 30).UnixNano()},
+	}
+
+	pts, err = Window(baseTime.Add(-time.Second*30).UnixNano(), baseTime.UnixNano(), map[string]interface{}{
+		"every":       "5s",
+		"createEmpty": true,
+	}, pts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pts, err = Fill(map[string]interface{}{
+		"usePrevious": true,
+		"fillValue":   -1,
+	}, pts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vals = []*val{}
+	for _, pt := range pts {
+		vals = append(vals, &val{pt.Value, pt.Null})
+	}
+
+	require.Equal(t, []*val{
+		{val: 42, null: false},
+		{val: 42, null: false},
+		{val: 42, null: false},
+		{val: 42, null: false},
+		{val: 42, null: false},
+		{val: 42, null: false},
+		{val: 42, null: false},
+	}, vals)
 }
