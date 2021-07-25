@@ -13,9 +13,9 @@ import (
 )
 
 var (
-	metricAndTagsRe            = regexp.MustCompile("^[a-zA-Z0-9_]+$")
-	errUnsupportedMetricName   = errors.New("valid characters for metrics are a-z, A-Z, 0-9, and _")
-	errUnsupportedTagName      = errors.New("valid characters for tag names are a-z, A-Z, 0-9, and _")
+	metricAndTagsRe            = regexp.MustCompile("^[a-zA-Z0-9_-]+$")
+	errUnsupportedMetricName   = errors.New("valid characters for metrics are a-z, A-Z, 0-9, -, and _")
+	errUnsupportedTagName      = errors.New("valid characters for tag names are a-z, A-Z, 0-9, -, and _")
 	errMetricRequired          = errors.New("metric is required")
 	errStartRequired           = errors.New("query start is required")
 	errWindowRequiredForMean   = errors.New("window must be set for mean aggregator")
