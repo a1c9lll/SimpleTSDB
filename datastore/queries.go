@@ -41,7 +41,7 @@ func generateMetricQuery(name string, tags []string) (string, error) {
 		}
 		buf.WriteString("x_" + tag + " text,")
 	}
-	return fmt.Sprintf(`CREATE TABLE simpletsdb_%s (timestamp bigint,%svalue double precision,PRIMARY KEY(timestamp,value))`, name, buf.String()), nil
+	return fmt.Sprintf(`CREATE TABLE simpletsdb_%s (timestamp bigint,%svalue double precision,UNIQUE(timestamp,value))`, name, buf.String()), nil
 }
 
 func CreateMetric(name string, tags []string) error {
@@ -128,7 +128,7 @@ func InsertPoint(query *core.InsertPointsQuery) error {
 		return err
 	}
 	queryStr := fmt.Sprintf(`INSERT INTO simpletsdb_%s (timestamp,%svalue) VALUES ($1,%s$%d)`, query.Metric, tagsStr, valuesStr, len(values))
-	if _, err = session.Query(queryStr, values...); err != nil && err.Error() != fmt.Sprintf(`pq: duplicate key value violates unique constraint "simpletsdb_%s_pkey"`, query.Metric) {
+	if _, err = session.Query(queryStr, values...); err != nil && err.Error() != fmt.Sprintf(`pq: duplicate key value violates unique constraint "simpletsdb_%s_timestamp_value_key"`, query.Metric) {
 		return err
 	}
 
