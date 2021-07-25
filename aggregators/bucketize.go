@@ -8,36 +8,32 @@ func Bucketize(points []*core.Point) [][]*core.Point {
 	}
 
 	var (
-		total         int
-		currentBucket []*core.Point
-		lastWindow    int64
-		buckets       [][]*core.Point
+		lastWindow int64
+		buckets    [][]*core.Point
+		idxStart   int
+		idxEnd     int
 	)
 
-	currentBucket = append(currentBucket, points[0])
+	idxStart = 0
+	idxEnd = 1
 	lastWindow = points[0].Window
-	total = 1
 
 	if len(points) > 1 {
 		for i := 1; i < len(points); i++ {
 			pt := points[i]
 			if pt.Window == lastWindow {
-				currentBucket = append(currentBucket, pt)
-				total++
+				idxEnd++
 			} else {
-				buckets = append(buckets, currentBucket)
-
-				currentBucket = []*core.Point{
-					pt,
-				}
-				total = 1
+				buckets = append(buckets, points[idxStart:idxEnd])
+				idxStart = i
+				idxEnd = i + 1
 			}
 			lastWindow = pt.Window
 		}
 	}
 
-	if total > 0 {
-		buckets = append(buckets, currentBucket)
+	if idxEnd-idxStart > 0 {
+		buckets = append(buckets, points[idxStart:idxEnd])
 	}
 
 	return buckets
