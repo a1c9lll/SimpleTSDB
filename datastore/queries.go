@@ -13,11 +13,12 @@ import (
 )
 
 var (
-	metricAndTagsRe            = regexp.MustCompile("^[a-zA-Z0-9_-]+$")
-	errUnsupportedMetricName   = errors.New("valid characters for metrics are a-z, A-Z, 0-9, -, and _")
-	errUnsupportedTagName      = errors.New("valid characters for tag names are a-z, A-Z, 0-9, -, and _")
+	metricAndTagsRe            = regexp.MustCompile(`^[a-zA-Z0-9_\-.]+$`)
+	errUnsupportedMetricName   = errors.New("valid characters for metrics are a-z, A-Z, 0-9, -, ., and _")
+	errUnsupportedTagName      = errors.New("valid characters for tag names are a-z, A-Z, 0-9, -, ., and _")
 	errMetricRequired          = errors.New("metric is required")
 	errStartRequired           = errors.New("query start is required")
+	errStringDuplicate         = `pq: duplicate key value violates unique constraint "simpletsdb_%s_timestamp_value_key"`
 	errWindowRequiredForMean   = errors.New("window must be set for mean aggregator")
 	errWindowRequiredForSum    = errors.New("window must be set for sum aggregator")
 	errWindowRequiredForMin    = errors.New("window must be set for min aggregator")
@@ -128,7 +129,7 @@ func InsertPoint(query *core.InsertPointsQuery) error {
 		return err
 	}
 	queryStr := fmt.Sprintf(`INSERT INTO simpletsdb_%s (timestamp,%svalue) VALUES ($1,%s$%d)`, query.Metric, tagsStr, valuesStr, len(values))
-	if _, err = session.Query(queryStr, values...); err != nil && err.Error() != fmt.Sprintf(`pq: duplicate key value violates unique constraint "simpletsdb_%s_timestamp_value_key"`, query.Metric) {
+	if _, err = session.Query(queryStr, values...); err != nil && err.Error() != fmt.Sprintf(errStringDuplicate, query.Metric) {
 		return err
 	}
 
