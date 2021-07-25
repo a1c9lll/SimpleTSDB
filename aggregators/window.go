@@ -55,7 +55,7 @@ func Window(startTime, endTime int64, options map[string]interface{}, points []*
 			found := false
 			for ; currentPoint < len(points); currentPoint++ {
 				pt := points[currentPoint]
-				if pt.Timestamp >= windowTime && pt.Timestamp <= windowTime+window.Nanoseconds() {
+				if pt.Timestamp >= windowTime && pt.Timestamp < windowTime+window.Nanoseconds() {
 					pt.Window = windowTime
 					newPoints = append(newPoints, pt)
 					found = true
@@ -84,7 +84,7 @@ func Window(startTime, endTime int64, options map[string]interface{}, points []*
 	for windowTime := startWindowTime; windowTime <= endWindowTime; windowTime += windowDur {
 		for ; currentPoint < len(points); currentPoint++ {
 			pt := points[currentPoint]
-			if pt.Timestamp >= windowTime && pt.Timestamp <= windowTime+window.Nanoseconds() {
+			if pt.Timestamp >= windowTime && pt.Timestamp < windowTime+window.Nanoseconds() {
 				pt.Window = windowTime
 			} else {
 				break
