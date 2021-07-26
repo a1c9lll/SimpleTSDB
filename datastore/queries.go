@@ -13,22 +13,13 @@ import (
 )
 
 var (
-	metricAndTagsRe            = regexp.MustCompile(`^[a-zA-Z0-9_\-.]+$`)
-	errUnsupportedMetricName   = errors.New("valid characters for metrics are a-z, A-Z, 0-9, -, ., and _")
-	errUnsupportedTagName      = errors.New("valid characters for tag names are a-z, A-Z, 0-9, -, ., and _")
-	errMetricRequired          = errors.New("metric is required")
-	errStartRequired           = errors.New("query start is required")
-	errStringDuplicate         = `pq: duplicate key value violates unique constraint "simpletsdb_%s_timestamp_value_key"`
-	errWindowRequiredForMean   = errors.New("window must be set for mean aggregator")
-	errWindowRequiredForSum    = errors.New("window must be set for sum aggregator")
-	errWindowRequiredForMin    = errors.New("window must be set for min aggregator")
-	errWindowRequiredForMax    = errors.New("window must be set for max aggregator")
-	errWindowRequiredForCount  = errors.New("window must be set for count aggregator")
-	errWindowRequiredForFirst  = errors.New("window must be set for first aggregator")
-	errWindowRequiredForLast   = errors.New("window must be set for last aggregator")
-	errWindowRequiredForMedian = errors.New("window must be set for median aggregator")
-	errWindowRequiredForMode   = errors.New("window must be set for mode aggregator")
-	errWindowRequiredForStdDev = errors.New("window must be set for stddev aggregator")
+	metricAndTagsRe          = regexp.MustCompile(`^[a-zA-Z0-9_\-.]+$`)
+	errUnsupportedMetricName = errors.New("valid characters for metrics are a-z, A-Z, 0-9, -, ., and _")
+	errUnsupportedTagName    = errors.New("valid characters for tag names are a-z, A-Z, 0-9, -, ., and _")
+	errUnsupportedTagValue   = errors.New("valid characters for tag values are a-z, A-Z, 0-9, -, ., and _")
+	errMetricRequired        = errors.New("metric is required")
+	errStartRequired         = errors.New("query start is required")
+	errStringDuplicate       = `pq: duplicate key value violates unique constraint "simpletsdb_%s_timestamp_value_key"`
 )
 
 func generateMetricQuery(name string, tags []string) (string, error) {
@@ -92,6 +83,9 @@ func generatePointInsertionStringsAndValues(query *core.InsertPointQuery) (strin
 		if !metricAndTagsRe.MatchString(k) {
 			return "", "", nil, errUnsupportedTagName
 		}
+		if !metricAndTagsRe.MatchString(v) {
+			return "", "", nil, errUnsupportedTagValue
+		}
 		tagsStrBuilder.WriteString("x_")
 		tagsStrBuilder.WriteString(k)
 		tagsStrBuilder.WriteString(",")
@@ -109,6 +103,9 @@ func generateTagsQueryString(tags map[string]string, queryVals []interface{}, ar
 	for k, v := range tags {
 		if !metricAndTagsRe.MatchString(k) {
 			return "", nil, 0, errUnsupportedTagName
+		}
+		if !metricAndTagsRe.MatchString(v) {
+			return "", nil, 0, errUnsupportedTagValue
 		}
 		s.WriteString(fmt.Sprintf(" AND x_%s = $%s", k, strconv.Itoa(argsCounter+1)))
 		argsCounter++
@@ -223,73 +220,9 @@ func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
 	}
 
 	for _, aggregator := range query.Aggregators {
-		switch aggregator.Name {
-		case "mean":
-			if !windowApplied {
-				return nil, errWindowRequiredForMean
-			}
-			points = aggregators.Mean(points)
-			windowedAggregatorApplied = true
-		case "sum":
-			if !windowApplied {
-				return nil, errWindowRequiredForSum
-			}
-			points = aggregators.Sum(points)
-			windowedAggregatorApplied = true
-		case "min":
-			if !windowApplied {
-				return nil, errWindowRequiredForMin
-			}
-			points = aggregators.Min(points)
-			windowedAggregatorApplied = true
-		case "max":
-			if !windowApplied {
-				return nil, errWindowRequiredForMax
-			}
-			points = aggregators.Max(points)
-			windowedAggregatorApplied = true
-		case "count":
-			if !windowApplied {
-				return nil, errWindowRequiredForCount
-			}
-			points, err = aggregators.Count(aggregator.Options, points)
-			if err != nil {
-				return nil, err
-			}
-			windowedAggregatorApplied = true
-		case "first":
-			if !windowApplied {
-				return nil, errWindowRequiredForFirst
-			}
-			points = aggregators.First(points)
-			windowedAggregatorApplied = true
-		case "last":
-			if !windowApplied {
-				return nil, errWindowRequiredForLast
-			}
-			points = aggregators.Last(points)
-			windowedAggregatorApplied = true
-		case "median":
-			if !windowApplied {
-				return nil, errWindowRequiredForMedian
-			}
-			points = aggregators.Median(points)
-			windowedAggregatorApplied = true
-		case "mode":
-			if !windowApplied {
-				return nil, errWindowRequiredForMode
-			}
-			points = aggregators.Mode(points)
-			windowedAggregatorApplied = true
-		case "stddev":
-			if !windowApplied {
-				return nil, errWindowRequiredForStdDev
-			}
-			points, err = aggregators.StdDev(aggregator.Options, points)
-			if err != nil {
-				return nil, err
-			}
-			windowedAggregatorApplied = true
+		points, windowedAggregatorApplied, err = aggregate(aggregator, windowApplied, points)
+		if err != nil {
+			return nil, err
 		}
 	}
 
