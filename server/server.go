@@ -25,6 +25,7 @@ func Init(tsdbHost string, tsdbPort int, tsdbReadTimeout, tsdbWriteTimeout time.
 	router.DELETE("/delete_metric", DeleteMetric)
 	router.POST("/insert_points", InsertPoints)
 	router.POST("/query_points", QueryPoints)
+	router.DELETE("/delete_points", DeletePoints)
 
 	s := &http.Server{
 		Addr:           fmt.Sprintf("%s:%d", tsdbHost, tsdbPort),
@@ -303,4 +304,50 @@ func QueryPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	if err := json.NewEncoder(w).Encode(points); err != nil {
 		log.Println(err)
 	}
+}
+
+/*
+Returns 400 on invalid request
+Returns 404 on metrics that don't exist
+Returns 200 on successful deletion
+*/
+func DeletePoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	typeHeader := r.Header.Values("Content-Type")
+
+	if len(typeHeader) != 1 {
+		log.Println("delete_points: content-type not set")
+		if err0 := write400Error(w, "content-type not set"); err0 != nil {
+			log.Println(err0)
+		}
+		return
+	}
+
+	if typeHeader[0] != "application/json" {
+		log.Println("delete_points: content-type must be application/json")
+		if err0 := write400Error(w, "content-type must be application/json"); err0 != nil {
+			log.Println(err0)
+		}
+		return
+	}
+
+	defer r.Body.Close()
+
+	req := &core.DeletePointsQuery{}
+	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+		log.Println(err)
+		if err0 := write400Error(w, err.Error()); err0 != nil {
+			log.Println(err0)
+		}
+		return
+	}
+
+	if err := datastore.DeletePoints(req); err != nil {
+		log.Println(err)
+		if err0 := write400Error(w, err.Error()); err0 != nil {
+			log.Println(err0)
+		}
+		return
+	}
+
+	w.WriteHeader(200)
 }

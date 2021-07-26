@@ -13,6 +13,13 @@ type InsertPointQuery struct {
 	Point  *Point            `json:"point"`
 }
 
+type DeletePointsQuery struct {
+	Metric string            `json:"metric"`
+	Start  int64             `json:"start"`
+	End    int64             `json:"end"`
+	Tags   map[string]string `json:"tags"`
+}
+
 type AggregatorQuery struct {
 	Name    string                 `json:"name"`
 	Options map[string]interface{} `json:"options"`

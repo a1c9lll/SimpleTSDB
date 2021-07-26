@@ -355,3 +355,54 @@ func TestQueryPoints(t *testing.T) {
 		{Null: true, Timestamp: 946684920000000000},
 	}, respPoints)
 }
+
+func TestDeletePoints(t *testing.T) {
+	datastore.DeleteMetric("test10")
+	datastore.CreateMetric("test10", []string{"id"})
+	queries := []*core.InsertPointQuery{}
+	baseTime := util.MustParseTime("2000-01-01T00:00:00Z")
+	for i := 0; i < 5; i++ {
+		q, _ := util.ParseLine([]byte(fmt.Sprintf("test10,id=28084,999 %d\n", baseTime.Add(time.Minute*time.Duration(i)).UnixNano())))
+		queries = append(queries, q)
+	}
+	if err := datastore.InsertPoints(queries); err != nil {
+		t.Fatal(err)
+	}
+	buf := &bytes.Buffer{}
+	if err := json.NewEncoder(buf).Encode(&core.DeletePointsQuery{
+		Metric: "test10",
+		Start:  baseTime.Add(time.Minute).UnixNano(),
+		End:    baseTime.Add(time.Minute * 3).UnixNano(),
+		Tags: map[string]string{
+			"id": "28084",
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest("POST", "/delete_points", buf)
+	req.Header.Add("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+
+	DeletePoints(w, req, nil)
+
+	resp := w.Result()
+
+	if resp.StatusCode != 200 {
+		t.Fatal()
+	}
+
+	points, err := datastore.QueryPoints(&core.PointsQuery{
+		Metric: "test10",
+		Start:  baseTime.UnixNano(),
+		End:    baseTime.Add(time.Minute * 4).UnixNano(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	require.Equal(t, []*core.Point{
+		{Value: 999, Timestamp: baseTime.UnixNano()},
+		{Value: 999, Timestamp: baseTime.Add(time.Minute * 4).UnixNano()},
+	}, points)
+}

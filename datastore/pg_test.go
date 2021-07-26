@@ -192,6 +192,62 @@ func TestInsertPointAndQuery(t *testing.T) {
 	}, vals)
 }
 
+func TestDeletePoints(t *testing.T) {
+	DeleteMetric("test9")
+	err := CreateMetric("test9", []string{"id"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	baseTime := time.Now().Add(-time.Minute * 50)
+	for i := 0; i < 10; i++ {
+		err := InsertPoint(&core.InsertPointQuery{
+			Metric: "test9",
+			Tags: map[string]string{
+				"id": "1",
+			},
+			Point: &core.Point{
+				Value:     float64(i),
+				Timestamp: baseTime.Add(time.Minute * 5 * time.Duration(i)).UnixNano(),
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err = DeletePoints(&core.DeletePointsQuery{
+		Metric: "test9",
+		Start:  baseTime.Add(time.Minute * 20).UnixNano(),
+		End:    baseTime.Add(time.Minute * 30).UnixNano(),
+		Tags: map[string]string{
+			"id": "1",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	points, err := QueryPoints(&core.PointsQuery{
+		Metric: "test9",
+		Start:  baseTime.UnixNano(),
+		End:    baseTime.Add(time.Minute * 50).UnixNano(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	require.Equal(t, []*core.Point{
+		{Value: 0, Timestamp: baseTime.UnixNano()},
+		{Value: 1, Timestamp: baseTime.Add(time.Minute * 5).UnixNano()},
+		{Value: 2, Timestamp: baseTime.Add(time.Minute * 10).UnixNano()},
+		{Value: 3, Timestamp: baseTime.Add(time.Minute * 15).UnixNano()},
+		{Value: 7, Timestamp: baseTime.Add(time.Minute * 35).UnixNano()},
+		{Value: 8, Timestamp: baseTime.Add(time.Minute * 40).UnixNano()},
+		{Value: 9, Timestamp: baseTime.Add(time.Minute * 45).UnixNano()},
+	}, points)
+}
+
 func TestDuplicateInsert(t *testing.T) {
 	err := CreateMetric("test2", []string{})
 	if err != nil {

@@ -22,6 +22,7 @@ var (
 	errMetricExists          = errors.New("metric already exists")
 	errMetricDoesNotExist    = errors.New("metric does not exist")
 	errStartRequired         = errors.New("query start is required")
+	errEndRequired           = errors.New("query end is required")
 	errStringDuplicate       = `pq: duplicate key value violates unique constraint "simpletsdb_%s_timestamp_value_key"`
 )
 
@@ -303,4 +304,42 @@ func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
 	}
 
 	return points, nil
+}
+
+func DeletePoints(query *core.DeletePointsQuery) error {
+	if query.Metric == "" {
+		return errMetricRequired
+	}
+	if !metricAndTagsRe.MatchString(query.Metric) {
+		return errUnsupportedMetricName
+	}
+	if query.Start == 0 {
+		return errStartRequired
+	}
+	if query.End == 0 {
+		return errEndRequired
+	}
+
+	var (
+		tagStr string
+		err    error
+	)
+
+	queryVals := []interface{}{
+		query.Start, query.End,
+	}
+
+	if len(query.Tags) > 0 {
+		tagStr, queryVals, _, err = generateTagsQueryString(query.Tags, queryVals, 2)
+		if err != nil {
+			return err
+		}
+	}
+
+	queryStr := fmt.Sprintf(`DELETE FROM simpletsdb_%s WHERE timestamp >= $1 AND timestamp <= $2%s`, query.Metric, tagStr)
+
+	if _, err := session.Query(queryStr, queryVals...); err != nil {
+		return nil
+	}
+	return nil
 }
