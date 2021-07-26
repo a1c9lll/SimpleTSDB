@@ -3,7 +3,7 @@ package core
 type Point struct {
 	Value     float64 `json:"value"`
 	Timestamp int64   `json:"timestamp"`
-	Window    int64   `json:"-"`
+	Window    int64   `json:"window,omitempty"`
 	Null      bool    `json:"-"`
 }
 
