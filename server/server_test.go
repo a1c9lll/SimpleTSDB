@@ -110,7 +110,7 @@ func TestCreateMetric(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req := httptest.NewRequest("PUT", "/create_metric", body)
+	req := httptest.NewRequest("POST", "/create_metric", body)
 	w := httptest.NewRecorder()
 
 	CreateMetric(w, req, nil)
@@ -139,7 +139,7 @@ func TestCreateMetric(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req = httptest.NewRequest("PUT", "/create_metric", body)
+	req = httptest.NewRequest("POST", "/create_metric", body)
 	req.Header.Add("Content-Type", "application/json")
 
 	w = httptest.NewRecorder()
@@ -148,7 +148,7 @@ func TestCreateMetric(t *testing.T) {
 
 	resp = w.Result()
 
-	if resp.StatusCode != 204 {
+	if resp.StatusCode != 409 {
 		t.Fatal()
 	}
 
@@ -164,7 +164,7 @@ func TestCreateMetric(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req = httptest.NewRequest("PUT", "/create_metric", body)
+	req = httptest.NewRequest("POST", "/create_metric", body)
 	req.Header.Add("Content-Type", "application/json")
 
 	w = httptest.NewRecorder()
@@ -173,7 +173,7 @@ func TestCreateMetric(t *testing.T) {
 
 	resp = w.Result()
 
-	if resp.StatusCode != 201 {
+	if resp.StatusCode != 200 {
 		t.Fatal()
 	}
 }

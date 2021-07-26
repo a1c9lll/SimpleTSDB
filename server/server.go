@@ -14,7 +14,7 @@ import (
 func Init(tsdbHost string, tsdbPort int, tsdbReadTimeout, tsdbWriteTimeout time.Duration) {
 	router := httprouter.New()
 	router.GET("/metric_exists", MetricExists)
-	router.PUT("/create_metric", MetricExists)
+	router.POST("/create_metric", MetricExists)
 	router.DELETE("/delete_metric", DeleteMetric)
 
 	s := &http.Server{
@@ -77,7 +77,6 @@ func MetricExists(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 			Exists: exists,
 		}); err != nil {
 			log.Println(err)
-			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 	}
@@ -85,8 +84,8 @@ func MetricExists(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
 /*
 Returns 400 on invalid request
-Returns 204 on metrics that already exist
-Returns 201 on successful creation
+Returns 409 on metrics that already exist
+Returns 200 on successful creation
 */
 func CreateMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	typeHeader := r.Header.Values("Content-Type")
@@ -119,7 +118,7 @@ func CreateMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	err := datastore.CreateMetric(req.Metric, req.Tags)
 	if err != nil {
 		if err.Error() == "metric already exists" {
-			w.WriteHeader(http.StatusNoContent)
+			w.WriteHeader(http.StatusConflict)
 		} else {
 			if err0 := write400Error(w, err.Error()); err0 != nil {
 				log.Println(err0)
@@ -128,7 +127,7 @@ func CreateMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusOK)
 }
 
 /*
