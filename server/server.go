@@ -226,8 +226,6 @@ func InsertPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
 	defer r.Body.Close()
 
-	queries := []*core.InsertPointQuery{}
-
 	scanner := bufio.NewScanner(r.Body)
 	buf := make([]byte, readLineProtocolBufferSize)
 	scanner.Buffer(buf, readLineProtocolBufferSize)
@@ -241,16 +239,15 @@ func InsertPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 			}
 			return
 		}
-		queries = append(queries, query)
-	}
 
-	err := datastore.InsertPoints(queries)
-	if err != nil {
-		log.Println(err)
-		if err0 := write400Error(w, err.Error()); err0 != nil {
-			log.Println(err0)
+		err = datastore.InsertPoint(query)
+		if err != nil {
+			log.Println(err)
+			if err0 := write400Error(w, err.Error()); err0 != nil {
+				log.Println(err0)
+			}
+			return
 		}
-		return
 	}
 
 	w.WriteHeader(http.StatusOK)
