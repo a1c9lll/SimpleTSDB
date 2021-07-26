@@ -21,7 +21,7 @@ var (
 func Init(tsdbHost string, tsdbPort int, tsdbReadTimeout, tsdbWriteTimeout time.Duration, readLineProtocolBufferSizeP int) {
 	router := httprouter.New()
 	router.GET("/metric_exists", MetricExists)
-	router.POST("/create_metric", MetricExists)
+	router.POST("/create_metric", CreateMetric)
 	router.DELETE("/delete_metric", DeleteMetric)
 	router.POST("/insert_points", InsertPoints)
 
