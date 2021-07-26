@@ -271,6 +271,7 @@ func TestInsertPoints(t *testing.T) {
 	body := &bytes.Buffer{}
 	body.WriteString(fmt.Sprintf("test6,id=28084 type=high,18765003.4 %d\n", baseTime.UnixNano()))
 	body.WriteString(fmt.Sprintf("test6,id=28084 type=high,18581431.53 %d\n", baseTime.Add(time.Minute).UnixNano()))
+	body.WriteString(fmt.Sprintf("test6,id=28084 type=high,null %d\n", baseTime.Add(time.Minute*2).UnixNano()))
 
 	req = httptest.NewRequest("POST", "/insert_points", body)
 	req.Header.Add("Content-Type", "text/plain")
@@ -299,5 +300,6 @@ func TestInsertPoints(t *testing.T) {
 	require.Equal(t, []*core.Point{
 		{Value: 18765003.4, Timestamp: 946684800000000000},
 		{Value: 18581431.53, Timestamp: 946684860000000000},
+		{Value: 0, Timestamp: 946684920000000000, Null: true},
 	}, pts)
 }

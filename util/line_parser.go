@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	lineMatchRe      = regexp.MustCompile(`^\s*([a-zA-Z0-9\-_.]+)\s*,\s*((?:[a-zA-Z0-9\-_.]+\s*=\s*[a-zA-Z0-9\-_.]+\s*)*)\s*,\s*[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)\s+([0-9]+)\s*$`)
+	lineMatchRe      = regexp.MustCompile(`^\s*([a-zA-Z0-9\-_.]+)\s*,\s*((?:[a-zA-Z0-9\-_.]+\s*=\s*[a-zA-Z0-9\-_.]+\s*)*)\s*,\s*([+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)|null)\s+([0-9]+)\s*$`)
 	errNoMatches     = errors.New("parse line: invalid line protocol syntax - no matches")
 	errInvalidSyntax = errors.New("parse line: invalid line protocol syntax")
 )
@@ -22,7 +22,7 @@ func ParseLine(line []byte) (*core.InsertPointQuery, error) {
 
 	match := strs[0]
 
-	if len(match) != 6 {
+	if len(match) != 7 {
 		return nil, errInvalidSyntax
 	}
 
@@ -41,12 +41,22 @@ func ParseLine(line []byte) (*core.InsertPointQuery, error) {
 		tags[key] = val
 	}
 
-	value, err := strconv.ParseFloat(string(match[3]), 64)
-	if err != nil {
-		return nil, err
+	mVal := string(match[3])
+	var (
+		isNull bool
+		value  float64
+		err    error
+	)
+	if mVal == "null" {
+		isNull = true
+	} else {
+		value, err = strconv.ParseFloat(mVal, 64)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	timestamp, err := strconv.ParseInt(string(match[5]), 10, 64)
+	timestamp, err := strconv.ParseInt(string(match[6]), 10, 64)
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +67,7 @@ func ParseLine(line []byte) (*core.InsertPointQuery, error) {
 		Point: &core.Point{
 			Value:     value,
 			Timestamp: timestamp,
+			Null:      isNull,
 		},
 	}, nil
 }

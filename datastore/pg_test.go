@@ -152,6 +152,44 @@ func TestInsertPointAndQuery(t *testing.T) {
 	if len(points) != 2 {
 		t.Fatalf("expected 2 points but got %d", len(points))
 	}
+
+	// insert null point
+	err = InsertPoint(&core.InsertPointQuery{
+		Metric: "test0",
+		Tags: map[string]string{
+			"id": "24987",
+		},
+		Point: &core.Point{
+			Timestamp: time.Now().UnixNano(),
+			Null:      true,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	points, err = QueryPoints(&core.PointsQuery{
+		Metric: "test0",
+		Tags: map[string]string{
+			"id": "24987",
+		},
+		Start: time.Now().Add(-time.Hour * 1).UnixNano(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type val struct {
+		val  float64
+		null bool
+	}
+	vals := []*val{}
+	for _, pt := range points {
+		vals = append(vals, &val{val: pt.Value, null: pt.Null})
+	}
+	require.Equal(t, []*val{
+		{val: 0, null: true},
+	}, vals)
 }
 
 func TestDuplicateInsert(t *testing.T) {
