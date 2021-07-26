@@ -24,11 +24,11 @@ func TestMain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	datastore.InitDB(cfg["postgres_username"], cfg["postgres_password"], cfg["postgres_host"], port, cfg["postgres_db"], cfg["postgres_ssl_mode"])
+	datastore.InitDB(cfg["postgres_username"], cfg["postgres_password"], cfg["postgres_host"], port, cfg["postgres_db"]+"_test", cfg["postgres_ssl_mode"])
 
-	datastore.DeleteMetric("test0")
+	datastore.DeleteMetric("test7")
 
-	err = datastore.CreateMetric("test0", []string{"id", "type"})
+	err = datastore.CreateMetric("test7", []string{"id", "type"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestMetricExists(t *testing.T) {
 	}
 
 	// test valid request and exists=true
-	req = httptest.NewRequest("GET", "/metric_exists?metric=test0", nil)
+	req = httptest.NewRequest("GET", "/metric_exists?metric=test7", nil)
 	w = httptest.NewRecorder()
 
 	MetricExists(w, req, nil)
@@ -131,11 +131,11 @@ func TestCreateMetric(t *testing.T) {
 	}
 
 	// test valid request where metric already exists
-	datastore.CreateMetric("test0", []string{"id", "type"})
+	datastore.CreateMetric("test8", []string{"id", "type"})
 
 	body = &bytes.Buffer{}
 	err = json.NewEncoder(body).Encode(&CreateMetricRequest{
-		Metric: "test0",
+		Metric: "test8",
 		Tags:   []string{"id", "type"},
 	})
 	if err != nil {

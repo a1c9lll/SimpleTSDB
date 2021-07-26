@@ -19,11 +19,11 @@ func TestMain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	InitDB(cfg["postgres_username"], cfg["postgres_password"], cfg["postgres_host"], port, cfg["postgres_db"], cfg["postgres_ssl_mode"])
+	InitDB(cfg["postgres_username"], cfg["postgres_password"], cfg["postgres_host"], port, cfg["postgres_db"]+"_test", cfg["postgres_ssl_mode"])
 
-	session.Query("drop table simpletsdb_test0")
-	session.Query("drop table simpletsdb_test1")
-	session.Query("drop table simpletsdb_test2")
+	DeleteMetric("test0")
+	DeleteMetric("test1")
+	DeleteMetric("test2")
 
 	err = CreateMetric("test0", []string{"id", "type"})
 	if err != nil {
