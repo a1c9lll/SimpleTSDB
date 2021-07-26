@@ -303,3 +303,55 @@ func TestInsertPoints(t *testing.T) {
 		{Value: 0, Timestamp: 946684920000000000, Null: true},
 	}, pts)
 }
+
+func TestQueryPoints(t *testing.T) {
+	// insert points first
+	datastore.DeleteMetric("test6")
+	datastore.CreateMetric("test6", []string{"id", "type"})
+	queries := []*core.InsertPointQuery{}
+	baseTime := util.MustParseTime("2000-01-01T00:00:00Z")
+	ptQ1, _ := util.ParseLine([]byte(fmt.Sprintf("test6,id=28084 type=high,18765003.4 %d\n", baseTime.UnixNano())))
+	queries = append(queries, ptQ1)
+	ptQ2, _ := util.ParseLine([]byte(fmt.Sprintf("test6,id=28084 type=high,18581431.53 %d\n", baseTime.Add(time.Minute).UnixNano())))
+	queries = append(queries, ptQ2)
+	ptQ3, _ := util.ParseLine([]byte(fmt.Sprintf("test6,id=28084 type=high,null %d\n", baseTime.Add(time.Minute*2).UnixNano())))
+	queries = append(queries, ptQ3)
+	err := datastore.InsertPoints(queries)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	buf := &bytes.Buffer{}
+	err = json.NewEncoder(buf).Encode(&core.PointsQuery{
+		Metric: "test6",
+		Start:  baseTime.UnixNano(),
+		Tags: map[string]string{
+			"id":   "28084",
+			"type": "high",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest("POST", "/query_points", buf)
+	req.Header.Add("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+
+	QueryPoints(w, req, nil)
+
+	resp := w.Result()
+
+	var respPoints []*core.Point
+	err = json.NewDecoder(resp.Body).Decode(&respPoints)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	require.Equal(t, []*core.Point{
+		{Value: 18765003.4, Timestamp: 946684800000000000},
+		{Value: 18581431.53, Timestamp: 946684860000000000},
+		{Null: true, Timestamp: 946684920000000000},
+	}, respPoints)
+}
