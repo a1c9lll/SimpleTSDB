@@ -69,6 +69,9 @@ func main() {
 	}
 
 	readLineProtocolBufferSize, err := strconv.Atoi(cfg["simpletsdb_line_buffer_size"])
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	server.Init(cfg["simpletsdb_bind_host"], serverPort, serverReadTimeout, serverWriteTimeout, readLineProtocolBufferSize)
 }

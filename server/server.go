@@ -62,12 +62,14 @@ func MetricExists(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		metric string
 	)
 	if metricForm, ok := r.Form["metric"]; !ok {
+		log.Println("metric is required")
 		if err := write400Error(w, "metric is required"); err != nil {
 			log.Println(err)
 		}
 		return
 	} else {
 		if len(metricForm) != 1 {
+			log.Println("only one metric allowed")
 			if err := write400Error(w, "only one metric allowed"); err != nil {
 				log.Println(err)
 			}
@@ -77,6 +79,7 @@ func MetricExists(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	}
 
 	if exists, err := datastore.MetricExists(metric); err != nil {
+		log.Println(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
 			log.Println(err0)
 		}
@@ -102,6 +105,7 @@ func CreateMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	typeHeader := r.Header.Values("Content-Type")
 
 	if len(typeHeader) != 1 {
+		log.Println("create_metric: content-type not set")
 		if err0 := write400Error(w, "content-type not set"); err0 != nil {
 			log.Println(err0)
 		}
@@ -109,6 +113,7 @@ func CreateMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	}
 
 	if typeHeader[0] != "application/json" {
+		log.Println("create_metric: content-type must be application/json")
 		if err0 := write400Error(w, "content-type must be application/json"); err0 != nil {
 			log.Println(err0)
 		}
@@ -120,6 +125,7 @@ func CreateMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	req := &CreateMetricRequest{}
 
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+		log.Println(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
 			log.Println(err0)
 		}
@@ -131,6 +137,7 @@ func CreateMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		if err.Error() == "metric already exists" {
 			w.WriteHeader(http.StatusConflict)
 		} else {
+			log.Println(err)
 			if err0 := write400Error(w, err.Error()); err0 != nil {
 				log.Println(err0)
 			}
@@ -150,6 +157,7 @@ func DeleteMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	typeHeader := r.Header.Values("Content-Type")
 
 	if len(typeHeader) != 1 {
+		log.Println("delete_metric: content-type not set")
 		if err0 := write400Error(w, "content-type not set"); err0 != nil {
 			log.Println(err0)
 		}
@@ -157,6 +165,7 @@ func DeleteMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	}
 
 	if typeHeader[0] != "application/json" {
+		log.Println("delete_metric: content-type must be application/json")
 		if err0 := write400Error(w, "content-type must be application/json"); err0 != nil {
 			log.Println(err0)
 		}
@@ -168,6 +177,7 @@ func DeleteMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	req := &DeleteMetricRequest{}
 
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+		log.Println(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
 			log.Println(err0)
 		}
@@ -179,6 +189,7 @@ func DeleteMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		if err.Error() == "metric does not exist" {
 			w.WriteHeader(http.StatusNotFound)
 		} else {
+			log.Println(err)
 			if err0 := write400Error(w, err.Error()); err0 != nil {
 				log.Println(err0)
 			}
@@ -189,10 +200,15 @@ func DeleteMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	w.WriteHeader(http.StatusOK)
 }
 
+/*
+Returns 400 on invalid request
+Returns 200 on successful insertion
+*/
 func InsertPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	typeHeader := r.Header.Values("Content-Type")
 
 	if len(typeHeader) != 1 {
+		log.Println("insert_points: content-type not set")
 		if err0 := write400Error(w, "content-type not set"); err0 != nil {
 			log.Println(err0)
 		}
@@ -200,6 +216,7 @@ func InsertPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	}
 
 	if typeHeader[0] != "text/plain" {
+		log.Println("insert_points: content-type must be text/plain")
 		if err0 := write400Error(w, "content-type must be text/plain"); err0 != nil {
 			log.Println(err0)
 		}
@@ -217,10 +234,10 @@ func InsertPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	for scanner.Scan() {
 		query, err := util.ParseLine(scanner.Bytes())
 		if err != nil {
+			log.Println(err)
 			if err0 := write400Error(w, err.Error()); err0 != nil {
 				log.Println(err0)
 			}
-			log.Println(err)
 			return
 		}
 		queries = append(queries, query)
@@ -228,6 +245,7 @@ func InsertPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
 	err := datastore.InsertPoints(queries)
 	if err != nil {
+		log.Println(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
 			log.Println(err0)
 		}
