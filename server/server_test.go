@@ -3,11 +3,14 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http/httptest"
+	"simpletsdb/core"
 	"simpletsdb/datastore"
 	"simpletsdb/util"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -247,4 +250,54 @@ func TestDeleteMetric(t *testing.T) {
 	if resp.StatusCode != 404 {
 		t.Fatal()
 	}
+}
+
+func TestInsertPoints(t *testing.T) {
+	// test invalid query
+	req := httptest.NewRequest("POST", "/insert_points", nil)
+	w := httptest.NewRecorder()
+	InsertPoints(w, req, nil)
+
+	resp := w.Result()
+
+	if resp.StatusCode != 400 {
+		t.Fatal()
+	}
+	// test valid query
+	datastore.DeleteMetric("test6")
+	datastore.CreateMetric("test6", []string{"id", "type"})
+
+	baseTime := util.MustParseTime("2000-01-01T00:00:00Z")
+	body := &bytes.Buffer{}
+	body.WriteString(fmt.Sprintf("test6,id=28084 type=high,18765003.4 %d\n", baseTime.UnixNano()))
+	body.WriteString(fmt.Sprintf("test6,id=28084 type=high,18581431.53 %d\n", baseTime.Add(time.Minute).UnixNano()))
+
+	req = httptest.NewRequest("POST", "/insert_points", body)
+	req.Header.Add("Content-Type", "text/plain")
+
+	w = httptest.NewRecorder()
+
+	InsertPoints(w, req, nil)
+
+	resp = w.Result()
+
+	if resp.StatusCode != 200 {
+		t.Fatal()
+	}
+
+	pts, err := datastore.QueryPoints(&core.PointsQuery{
+		Metric: "test6",
+		Start:  baseTime.UnixNano(),
+		Tags: map[string]string{
+			"id": "28084",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	require.Equal(t, []*core.Point{
+		{Value: 18765003.4, Timestamp: 946684800000000000},
+		{Value: 18581431.53, Timestamp: 946684860000000000},
+	}, pts)
 }

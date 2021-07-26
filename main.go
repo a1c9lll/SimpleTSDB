@@ -52,6 +52,9 @@ func main() {
 	if v, ok := cfg["simpletsdb_write_timeout"]; v == "" || !ok {
 		log.Fatal("simpletsdb_write_timeout config is required")
 	}
+	if v, ok := cfg["simpletsdb_line_buffer_size"]; v == "" || !ok {
+		log.Fatal("simpletsdb_line_buffer_size config is required")
+	}
 	serverPort, err := strconv.Atoi(cfg["simpletsdb_bind_port"])
 	if err != nil {
 		log.Fatal(err)
@@ -64,5 +67,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	server.Init(cfg["simpletsdb_bind_host"], serverPort, serverReadTimeout, serverWriteTimeout)
+
+	readLineProtocolBufferSize, err := strconv.Atoi(cfg["simpletsdb_line_buffer_size"])
+
+	server.Init(cfg["simpletsdb_bind_host"], serverPort, serverReadTimeout, serverWriteTimeout, readLineProtocolBufferSize)
 }

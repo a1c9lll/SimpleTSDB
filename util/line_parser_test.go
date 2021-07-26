@@ -8,7 +8,7 @@ import (
 )
 
 func TestLineParser(t *testing.T) {
-	insert, err := ParseLine(`test0,id=28084 type=high,18765003.4 138456387`)
+	insert, err := ParseLine([]byte(`test0,id=28084 type=high,18765003.4 138456387`))
 
 	if err != nil {
 		t.Fatal(err)
@@ -26,7 +26,7 @@ func TestLineParser(t *testing.T) {
 		},
 	}, insert)
 
-	insert, err = ParseLine(`test0,,187650 138456387`)
+	insert, err = ParseLine([]byte(`test0,,187650 138456387`))
 
 	if err != nil {
 		t.Fatal(err)
@@ -41,13 +41,13 @@ func TestLineParser(t *testing.T) {
 		},
 	}, insert)
 
-	_, err = ParseLine(`111`)
+	_, err = ParseLine([]byte(`111`))
 
 	if err == nil {
 		t.Fatal("expected error")
 	}
 
-	_, err = ParseLine(`test0,, 138456387`)
+	_, err = ParseLine([]byte(`test0,, 138456387`))
 
 	if err == nil {
 		t.Fatal("expected error")

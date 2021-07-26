@@ -14,8 +14,8 @@ var (
 	errInvalidSyntax = errors.New("parse line: invalid line protocol syntax")
 )
 
-func ParseLine(line string) (*core.InsertPointQuery, error) {
-	strs := lineMatchRe.FindAllStringSubmatch(line, -1)
+func ParseLine(line []byte) (*core.InsertPointQuery, error) {
+	strs := lineMatchRe.FindAllSubmatch(line, -1)
 	if len(strs) != 1 {
 		return nil, errNoMatches
 	}
@@ -26,9 +26,9 @@ func ParseLine(line string) (*core.InsertPointQuery, error) {
 		return nil, errInvalidSyntax
 	}
 
-	metric := match[1]
+	metric := string(match[1])
 
-	tagsStrs := strings.Split(match[2], " ")
+	tagsStrs := strings.Split(string(match[2]), " ")
 	tags := map[string]string{}
 
 	for _, s := range tagsStrs {
@@ -41,12 +41,12 @@ func ParseLine(line string) (*core.InsertPointQuery, error) {
 		tags[key] = val
 	}
 
-	value, err := strconv.ParseFloat(match[3], 64)
+	value, err := strconv.ParseFloat(string(match[3]), 64)
 	if err != nil {
 		return nil, err
 	}
 
-	timestamp, err := strconv.ParseInt(match[5], 10, 64)
+	timestamp, err := strconv.ParseInt(string(match[5]), 10, 64)
 	if err != nil {
 		return nil, err
 	}

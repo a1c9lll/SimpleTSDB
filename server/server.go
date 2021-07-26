@@ -1,21 +1,29 @@
 package server
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"simpletsdb/core"
 	"simpletsdb/datastore"
+	"simpletsdb/util"
 	"time"
 
 	"github.com/julienschmidt/httprouter"
 )
 
-func Init(tsdbHost string, tsdbPort int, tsdbReadTimeout, tsdbWriteTimeout time.Duration) {
+var (
+	readLineProtocolBufferSize = 65536
+)
+
+func Init(tsdbHost string, tsdbPort int, tsdbReadTimeout, tsdbWriteTimeout time.Duration, readLineProtocolBufferSizeP int) {
 	router := httprouter.New()
 	router.GET("/metric_exists", MetricExists)
 	router.POST("/create_metric", MetricExists)
 	router.DELETE("/delete_metric", DeleteMetric)
+	router.POST("/insert_points", InsertPoints)
 
 	s := &http.Server{
 		Addr:           fmt.Sprintf("%s:%d", tsdbHost, tsdbPort),
@@ -24,6 +32,9 @@ func Init(tsdbHost string, tsdbPort int, tsdbReadTimeout, tsdbWriteTimeout time.
 		WriteTimeout:   tsdbWriteTimeout,
 		MaxHeaderBytes: 1 << 20,
 	}
+
+	readLineProtocolBufferSize = readLineProtocolBufferSizeP
+
 	log.Fatal(s.ListenAndServe())
 }
 
@@ -171,6 +182,54 @@ func DeleteMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 			if err0 := write400Error(w, err.Error()); err0 != nil {
 				log.Println(err0)
 			}
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func InsertPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	typeHeader := r.Header.Values("Content-Type")
+
+	if len(typeHeader) != 1 {
+		if err0 := write400Error(w, "content-type not set"); err0 != nil {
+			log.Println(err0)
+		}
+		return
+	}
+
+	if typeHeader[0] != "text/plain" {
+		if err0 := write400Error(w, "content-type must be text/plain"); err0 != nil {
+			log.Println(err0)
+		}
+		return
+	}
+
+	defer r.Body.Close()
+
+	queries := []*core.InsertPointQuery{}
+
+	scanner := bufio.NewScanner(r.Body)
+	buf := make([]byte, readLineProtocolBufferSize)
+	scanner.Buffer(buf, readLineProtocolBufferSize)
+
+	for scanner.Scan() {
+		query, err := util.ParseLine(scanner.Bytes())
+		if err != nil {
+			if err0 := write400Error(w, err.Error()); err0 != nil {
+				log.Println(err0)
+			}
+			log.Println(err)
+			return
+		}
+		queries = append(queries, query)
+	}
+
+	err := datastore.InsertPoints(queries)
+	if err != nil {
+		if err0 := write400Error(w, err.Error()); err0 != nil {
+			log.Println(err0)
 		}
 		return
 	}
