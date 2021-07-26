@@ -133,22 +133,6 @@ func generatePointInsertionStringsAndValues(query *core.InsertPointQuery) (strin
 	return tagsStrBuilder.String(), valuesStrBuilder.String(), values, nil
 }
 
-func generateTagsQueryString(tags map[string]string, queryVals []interface{}, argsCounter int) (string, []interface{}, int, error) {
-	s := &strings.Builder{}
-	for k, v := range tags {
-		if !metricAndTagsRe.MatchString(k) {
-			return "", nil, 0, errUnsupportedTagName
-		}
-		if !metricAndTagsRe.MatchString(v) {
-			return "", nil, 0, errUnsupportedTagValue
-		}
-		s.WriteString(fmt.Sprintf(" AND x_%s = $%s", k, strconv.Itoa(argsCounter+1)))
-		argsCounter++
-		queryVals = append(queryVals, v)
-	}
-	return s.String(), queryVals, argsCounter - 1, nil
-}
-
 func InsertPoint(query *core.InsertPointQuery) error {
 	if query.Metric == "" {
 		return errMetricRequired
@@ -202,6 +186,22 @@ func InsertPoints(queries []*core.InsertPointQuery) error {
 		return err
 	}
 	return nil
+}
+
+func generateTagsQueryString(tags map[string]string, queryVals []interface{}, argsCounter int) (string, []interface{}, int, error) {
+	s := &strings.Builder{}
+	for k, v := range tags {
+		if !metricAndTagsRe.MatchString(k) {
+			return "", nil, 0, errUnsupportedTagName
+		}
+		if !metricAndTagsRe.MatchString(v) {
+			return "", nil, 0, errUnsupportedTagValue
+		}
+		s.WriteString(fmt.Sprintf(" AND x_%s = $%s", k, strconv.Itoa(argsCounter+1)))
+		argsCounter++
+		queryVals = append(queryVals, v)
+	}
+	return s.String(), queryVals, argsCounter - 1, nil
 }
 
 func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
@@ -271,8 +271,9 @@ func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
 	}
 
 	var (
-		windowApplied             bool
-		windowedAggregatorApplied bool
+		windowApplied              bool
+		windowedAggregatorApplied  bool
+		windowedAggregatorApplied0 bool
 	)
 
 	if query.Window != nil {
@@ -284,9 +285,12 @@ func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
 	}
 
 	for _, aggregator := range query.Aggregators {
-		points, windowedAggregatorApplied, err = aggregate(aggregator, windowApplied, points)
+		points, windowedAggregatorApplied0, err = aggregate(aggregator, windowApplied, points)
 		if err != nil {
 			return nil, err
+		}
+		if windowedAggregatorApplied0 {
+			windowedAggregatorApplied = true
 		}
 	}
 
