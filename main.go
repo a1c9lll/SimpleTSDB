@@ -32,12 +32,15 @@ func main() {
 	if v, ok := cfg["postgress_port"]; v == "" || !ok {
 		log.Fatal("postgress_port config is required")
 	}
+	if v, ok := cfg["postgres_db"]; v == "" || !ok {
+		log.Fatal("postgres_db config is required")
+	}
 
 	dbPort, err := strconv.Atoi(cfg["postgres_port"])
 	if err != nil {
 		log.Fatal(err)
 	}
-	datastore.InitDB(cfg["postgres_username"], cfg["postgres_password"], cfg["postgres_password"], dbPort, cfg["postgress_ssl_mode"])
+	datastore.InitDB(cfg["postgres_username"], cfg["postgres_password"], cfg["postgres_password"], dbPort, cfg["postgres_db"], cfg["postgress_ssl_mode"])
 
 	// init server
 	if v, ok := cfg["simpletsdb_bind_host"]; v == "" || !ok {

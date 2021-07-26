@@ -24,7 +24,7 @@ func TestMain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	datastore.InitDB(cfg["postgres_username"], cfg["postgres_password"], cfg["postgres_host"], port, cfg["postgres_ssl_mode"])
+	datastore.InitDB(cfg["postgres_username"], cfg["postgres_password"], cfg["postgres_host"], port, cfg["postgres_db"], cfg["postgres_ssl_mode"])
 
 	datastore.DeleteMetric("test0")
 

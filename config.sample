@@ -2,7 +2,8 @@
 postgres_username=postgres
 postgres_password=
 postgres_host=127.0.0.1
-postgres_port=5433
+postgres_port=5432
+postgres_db=simpletsdb
 postgres_ssl_mode=disable
 
 # SimpleTSDB configuration

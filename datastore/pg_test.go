@@ -19,7 +19,7 @@ func TestMain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	InitDB(cfg["postgres_username"], cfg["postgres_password"], cfg["postgres_host"], port, cfg["postgres_ssl_mode"])
+	InitDB(cfg["postgres_username"], cfg["postgres_password"], cfg["postgres_host"], port, cfg["postgres_db"], cfg["postgres_ssl_mode"])
 
 	session.Query("drop table simpletsdb_test0")
 	session.Query("drop table simpletsdb_test1")
