@@ -18,14 +18,13 @@ var (
 	errUnsupportedTagName    = errors.New("valid characters for tag names are a-z, A-Z, 0-9, -, ., and _")
 	errUnsupportedTagValue   = errors.New("valid characters for tag values are a-z, A-Z, 0-9, -, ., and _")
 	errMetricRequired        = errors.New("metric is required")
+	errMetricExists          = errors.New("metric already exists")
+	errMetricDoesNotExist    = errors.New("metric does not exist")
 	errStartRequired         = errors.New("query start is required")
 	errStringDuplicate       = `pq: duplicate key value violates unique constraint "simpletsdb_%s_timestamp_value_key"`
 )
 
 func generateMetricQuery(name string, tags []string) (string, error) {
-	if !metricAndTagsRe.MatchString(name) {
-		return "", errUnsupportedMetricName
-	}
 	buf := &strings.Builder{}
 	for _, tag := range tags {
 		if !metricAndTagsRe.MatchString(tag) {
@@ -37,17 +36,32 @@ func generateMetricQuery(name string, tags []string) (string, error) {
 }
 
 func CreateMetric(name string, tags []string) error {
+	if name == "" {
+		return errMetricRequired
+	}
+	if !metricAndTagsRe.MatchString(name) {
+		return errUnsupportedMetricName
+	}
 	queryStr, err := generateMetricQuery(name, tags)
 	if err != nil {
 		return err
 	}
 	if _, err = session.Query(queryStr); err != nil {
+		if err.Error() == fmt.Sprintf(`pq: relation "simpletsdb_%s" already exists`, name) {
+			return errMetricExists
+		}
 		return err
 	}
 	return nil
 }
 
 func MetricExists(name string) (bool, error) {
+	if name == "" {
+		return false, errMetricRequired
+	}
+	if !metricAndTagsRe.MatchString(name) {
+		return false, errUnsupportedMetricName
+	}
 	var (
 		name0 string
 		found bool
@@ -72,6 +86,23 @@ func MetricExists(name string) (bool, error) {
 	}
 
 	return found, nil
+}
+
+func DeleteMetric(name string) error {
+	if name == "" {
+		return errMetricRequired
+	}
+	if !metricAndTagsRe.MatchString(name) {
+		return errUnsupportedMetricName
+	}
+	_, err := session.Query(fmt.Sprintf("DROP TABLE simpletsdb_%s", name))
+	if err != nil {
+		if err.Error() == fmt.Sprintf(`pq: table "simpletsdb_%s" does not exist`, name) {
+			return errMetricDoesNotExist
+		}
+		return err
+	}
+	return nil
 }
 
 func generatePointInsertionStringsAndValues(query *core.InsertPointQuery) (string, string, []interface{}, error) {

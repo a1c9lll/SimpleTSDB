@@ -3,16 +3,14 @@ package main
 import (
 	"log"
 	"strconv"
+	"time"
 
 	"simpletsdb/datastore"
+	"simpletsdb/server"
 	"simpletsdb/util"
 )
 
 func main() {
-
-}
-
-func init() {
 	// load config
 	cfg := map[string]string{}
 	if err := util.LoadConfig("config", cfg); err != nil {
@@ -31,9 +29,40 @@ func init() {
 	if v, ok := cfg["postgress_host"]; v == "" || !ok {
 		log.Fatal("postgress_host config is required")
 	}
-	port, err := strconv.Atoi(cfg["postgres_port"])
+	if v, ok := cfg["postgress_port"]; v == "" || !ok {
+		log.Fatal("postgress_port config is required")
+	}
+
+	dbPort, err := strconv.Atoi(cfg["postgres_port"])
 	if err != nil {
 		log.Fatal(err)
 	}
-	datastore.InitDB(cfg["postgres_username"], cfg["postgres_password"], cfg["postgres_password"], port, cfg["postgress_ssl_mode"])
+	datastore.InitDB(cfg["postgres_username"], cfg["postgres_password"], cfg["postgres_password"], dbPort, cfg["postgress_ssl_mode"])
+
+	// init server
+	if v, ok := cfg["simpletsdb_bind_host"]; v == "" || !ok {
+		log.Fatal("simpletsdb_bind_host config is required")
+	}
+	if v, ok := cfg["simpletsdb_bind_port"]; v == "" || !ok {
+		log.Fatal("simpletsdb_bind_port config is required")
+	}
+	if v, ok := cfg["simpletsdb_read_timeout"]; v == "" || !ok {
+		log.Fatal("simpletsdb_read_timeout config is required")
+	}
+	if v, ok := cfg["simpletsdb_write_timeout"]; v == "" || !ok {
+		log.Fatal("simpletsdb_write_timeout config is required")
+	}
+	serverPort, err := strconv.Atoi(cfg["simpletsdb_bind_port"])
+	if err != nil {
+		log.Fatal(err)
+	}
+	serverReadTimeout, err := time.ParseDuration(cfg["simpletsdb_read_timeout"])
+	if err != nil {
+		log.Fatal(err)
+	}
+	serverWriteTimeout, err := time.ParseDuration(cfg["simpletsdb_write_timeout"])
+	if err != nil {
+		log.Fatal(err)
+	}
+	server.Init(cfg["simpletsdb_bind_host"], serverPort, serverReadTimeout, serverWriteTimeout)
 }

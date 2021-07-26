@@ -4,3 +4,9 @@ postgres_password=
 postgres_host=127.0.0.1
 postgres_port=5433
 postgres_ssl_mode=disable
+
+# SimpleTSDB configuration
+simpletsdb_bind_host=127.0.0.1
+simpletsdb_bind_port=8981
+simpletsdb_read_timeout=10s
+simpletsdb_write_timeout=10s
