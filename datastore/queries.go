@@ -1,6 +1,7 @@
 package datastore
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -172,13 +173,34 @@ func InsertPoint(query *core.InsertPointQuery) error {
 //       difficult to keep the insert order with multiple different
 //       metrics being inserted.
 func InsertPoints(queries []*core.InsertPointQuery) error {
+	ctx := context.Background()
+	tx, err := session.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
 	for _, query := range queries {
-		err := InsertPoint(query)
+		if query.Metric == "" {
+			tx.Rollback()
+			return errMetricRequired
+		}
+		if !metricAndTagsRe.MatchString(query.Metric) {
+			tx.Rollback()
+			return errUnsupportedMetricName
+		}
+		tagsStr, valuesStr, values, err := generatePointInsertionStringsAndValues(query)
 		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		queryStr := fmt.Sprintf(`INSERT INTO simpletsdb_%s (timestamp,%svalue) VALUES ($1,%s$%d)`, query.Metric, tagsStr, valuesStr, len(values))
+		if _, err = tx.ExecContext(ctx, queryStr, values...); err != nil && err.Error() != fmt.Sprintf(errStringDuplicate, query.Metric) {
+			tx.Rollback()
 			return err
 		}
 	}
-
+	if err := tx.Commit(); err != nil {
+		return err
+	}
 	return nil
 }
 
