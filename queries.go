@@ -11,6 +11,7 @@ import (
 
 var (
 	metricAndTagsRe                = regexp.MustCompile(`^[a-zA-Z0-9_\-.]+$`)
+	insertBatchSize                = 200
 	errUnsupportedMetricName       = errors.New("valid characters for metrics are a-z, A-Z, 0-9, -, ., and _")
 	errUnsupportedTagName          = errors.New("valid characters for tag names are a-z, A-Z, 0-9, -, ., and _")
 	errUnsupportedTagValue         = errors.New("valid characters for tag values are a-z, A-Z, 0-9, -, ., and _")
@@ -167,8 +168,8 @@ func insertPoints(queries0 []*insertPointQuery) error {
 	// batch the queries 200 at a time to get around
 	// max insert limit of postgres
 	firstMetric := queries0[0].Metric
-	for i := 0; i < len(queries0); i += 200 {
-		queries := queries0[i:min1(i+200, len(queries0))]
+	for i := 0; i < len(queries0); i += insertBatchSize {
+		queries := queries0[i:min1(i+insertBatchSize, len(queries0))]
 		tagsStr, valuesStr, values, err := generatePointInsertionStringsAndValues(queries, firstMetric)
 		if err != nil {
 			return err

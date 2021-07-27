@@ -77,6 +77,15 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if v, ok := cfg["simpletsdb_insert_batch_size"]; v == "" || !ok {
+		log.Fatal("simpletsdb_insert_batch_size config is required")
+	}
+
+	insertBatchSize, err = strconv.Atoi(cfg["simpletsdb_insert_batch_size"])
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	log.Infof("Initializing server at %s:%d", cfg["simpletsdb_bind_host"], serverPort)
 	initServer(cfg["simpletsdb_bind_host"], serverPort, serverReadTimeout, serverWriteTimeout, readLineProtocolBufferSize)
 }
