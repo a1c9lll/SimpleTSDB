@@ -227,9 +227,9 @@ func InsertPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		return
 	}
 
-	if typeHeader[0] != "text/plain" {
-		log.Error("insert_points: content-type must be text/plain")
-		if err0 := write400Error(w, "content-type must be text/plain"); err0 != nil {
+	if typeHeader[0] != "application/x.simpletsdb.points" {
+		log.Error("insert_points: content-type must be application/x.simpletsdb.points")
+		if err0 := write400Error(w, "content-type must be application/x.simpletsdb.points"); err0 != nil {
 			log.Error(err0)
 		}
 		return

@@ -278,7 +278,7 @@ func TestInsertPoints(t *testing.T) {
 	body.WriteString(fmt.Sprintf("test6,id=28084 type=high,null %d\n", baseTime.Add(time.Minute*2).UnixNano()))
 
 	req = httptest.NewRequest("POST", "/insert_points", body)
-	req.Header.Add("Content-Type", "text/plain")
+	req.Header.Add("Content-Type", "application/x.simpletsdb.points")
 
 	w = httptest.NewRecorder()
 
