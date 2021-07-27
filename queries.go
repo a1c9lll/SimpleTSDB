@@ -1,8 +1,6 @@
 package main
 
 import (
-	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"regexp"
@@ -12,16 +10,17 @@ import (
 )
 
 var (
-	metricAndTagsRe          = regexp.MustCompile(`^[a-zA-Z0-9_\-.]+$`)
-	errUnsupportedMetricName = errors.New("valid characters for metrics are a-z, A-Z, 0-9, -, ., and _")
-	errUnsupportedTagName    = errors.New("valid characters for tag names are a-z, A-Z, 0-9, -, ., and _")
-	errUnsupportedTagValue   = errors.New("valid characters for tag values are a-z, A-Z, 0-9, -, ., and _")
-	errMetricRequired        = errors.New("metric is required")
-	errMetricExists          = errors.New("metric already exists")
-	errMetricDoesNotExist    = errors.New("metric does not exist")
-	errStartRequired         = errors.New("query start is required")
-	errEndRequired           = errors.New("query end is required")
-	errStringDuplicate       = `pq: duplicate key value violates unique constraint "simpletsdb_%s_timestamp_value_key"`
+	metricAndTagsRe                = regexp.MustCompile(`^[a-zA-Z0-9_\-.]+$`)
+	errUnsupportedMetricName       = errors.New("valid characters for metrics are a-z, A-Z, 0-9, -, ., and _")
+	errUnsupportedTagName          = errors.New("valid characters for tag names are a-z, A-Z, 0-9, -, ., and _")
+	errUnsupportedTagValue         = errors.New("valid characters for tag values are a-z, A-Z, 0-9, -, ., and _")
+	errMetricRequired              = errors.New("metric is required")
+	errMetricExists                = errors.New("metric already exists")
+	errMetricDoesNotExist          = errors.New("metric does not exist")
+	errStartRequired               = errors.New("query start is required")
+	errEndRequired                 = errors.New("query end is required")
+	errStringDuplicate             = `pq: duplicate key value violates unique constraint "simpletsdb_%s_timestamp_value_key"`
+	errPointRequiredForInsertQuery = errors.New("point required for insert query")
 )
 
 func generateMetricQuery(name string, tags []string) (string, error) {
@@ -106,87 +105,69 @@ func deleteMetric(name string) error {
 	return nil
 }
 
-func generatePointInsertionStringsAndValues(query *insertPointQuery) (string, string, []interface{}, error) {
+func generatePointInsertionStringsAndValues(queries []*insertPointQuery) (string, string, []interface{}, error) {
 	tagsStrBuilder, valuesStrBuilder := &strings.Builder{}, &strings.Builder{}
-	values := []interface{}{query.Point.Timestamp}
+	values := []interface{}{}
 
-	var i = 2
-	for k, v := range query.Tags {
+	tagsOrder := []string{}
+
+	for k, _ := range queries[0].Tags {
 		if !metricAndTagsRe.MatchString(k) {
 			return "", "", nil, errUnsupportedTagName
 		}
-		if !metricAndTagsRe.MatchString(v) {
-			return "", "", nil, errUnsupportedTagValue
-		}
+		tagsOrder = append(tagsOrder, k)
 		tagsStrBuilder.WriteString("x_")
 		tagsStrBuilder.WriteString(k)
 		tagsStrBuilder.WriteString(",")
-		valuesStrBuilder.WriteString("$" + strconv.Itoa(i) + ",")
-		i++
-		values = append(values, v)
 	}
-	values = append(values, query.Point.Value)
 
+	var i = 1
+	for z, query := range queries {
+		if !metricAndTagsRe.MatchString(query.Metric) {
+			return "", "", nil, errUnsupportedMetricName
+		}
+		if query.Point == nil {
+			return "", "", nil, errPointRequiredForInsertQuery
+		}
+		values = append(values, query.Point.Timestamp)
+		valuesStrBuilder.WriteString("($" + strconv.Itoa(i) + ",")
+		i++
+		for _, t := range tagsOrder {
+			v := query.Tags[t]
+			if !metricAndTagsRe.MatchString(v) {
+				return "", "", nil, errUnsupportedTagValue
+			}
+			valuesStrBuilder.WriteString("$" + strconv.Itoa(i) + ",")
+			i++
+			values = append(values, v)
+		}
+		values = append(values, query.Point.Value)
+		valuesStrBuilder.WriteString("$" + strconv.Itoa(i) + ")")
+		if z+1 < len(queries) {
+			valuesStrBuilder.WriteString(",")
+		}
+		i++
+	}
 	return tagsStrBuilder.String(), valuesStrBuilder.String(), values, nil
 }
 
-func insertPoint(query *insertPointQuery) error {
-	if query.Metric == "" {
-		return errMetricRequired
-	}
-	if !metricAndTagsRe.MatchString(query.Metric) {
-		return errUnsupportedMetricName
-	}
-	tagsStr, valuesStr, values, err := generatePointInsertionStringsAndValues(query)
-	if err != nil {
-		return err
-	}
-	queryStr := fmt.Sprintf(`INSERT INTO simpletsdb_%s (timestamp,%svalue) VALUES ($1,%s$%d)`, query.Metric, tagsStr, valuesStr, len(values))
-	if _, err := session.Query(queryStr, values...); err != nil && err.Error() != fmt.Sprintf(errStringDuplicate, query.Metric) {
-		return err
-	}
-
-	return nil
-}
-
-// This function just calls single inserts for each point.
-// TODO: Batch the inserts if possible. Although it may be
-//       difficult to keep the insert order with multiple different
-//       metrics being inserted.
-func insertPoints(queries []*insertPointQuery) error {
-	ctx := context.Background()
-	tx, err := session.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	for _, query := range queries {
-		if query.Metric == "" {
-			tx.Rollback()
-			return errMetricRequired
-		}
-		if !metricAndTagsRe.MatchString(query.Metric) {
-			tx.Rollback()
-			return errUnsupportedMetricName
-		}
-		tagsStr, valuesStr, values, err := generatePointInsertionStringsAndValues(query)
+/*
+Must all be the same metric name
+Must not be duplicates of (timestamp, value)
+*/
+func insertPoints(queries0 []*insertPointQuery) error {
+	// batch the queries 200 at a time to get around
+	// max insert limit of postgres
+	for i := 0; i < len(queries0); i += 200 {
+		queries := queries0[i:min1(i+200, len(queries0))]
+		tagsStr, valuesStr, values, err := generatePointInsertionStringsAndValues(queries)
 		if err != nil {
-			tx.Rollback()
 			return err
 		}
-		var (
-			resp *sql.Rows
-		)
-		queryStr := fmt.Sprintf(`INSERT INTO simpletsdb_%s (timestamp,%svalue) VALUES ($1,%s$%d)`, query.Metric, tagsStr, valuesStr, len(values))
-		if resp, err = tx.QueryContext(ctx, queryStr, values...); err != nil && err.Error() != fmt.Sprintf(errStringDuplicate, query.Metric) {
-			tx.Rollback()
-			resp.Close()
+		queryStr := fmt.Sprintf(`INSERT INTO simpletsdb_%s (timestamp,%svalue) VALUES %s`, queries[0].Metric, tagsStr, valuesStr)
+		if _, err := session.Exec(queryStr, values...); err != nil && err.Error() != fmt.Sprintf(errStringDuplicate, queries[0].Metric) {
 			return err
-		} else {
-			resp.Close()
 		}
-	}
-	if err := tx.Commit(); err != nil {
-		return err
 	}
 	return nil
 }

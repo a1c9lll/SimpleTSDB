@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -127,7 +128,7 @@ func createMetricHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 
 	req := &createMetricRequest{}
 
-	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(req); err != nil && err != io.EOF {
 		log.Error(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
 			log.Error(err0)
@@ -182,7 +183,7 @@ func deleteMetricHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 
 	req := &deleteMetricRequest{}
 
-	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(req); err != nil && err != io.EOF {
 		log.Error(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
 			log.Error(err0)
@@ -237,7 +238,7 @@ func insertPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 	scanner := bufio.NewScanner(r.Body)
 	buf := make([]byte, readLineProtocolBufferSize)
 	scanner.Buffer(buf, readLineProtocolBufferSize)
-
+	queries := []*insertPointQuery{}
 	for scanner.Scan() {
 		query, err := parseLine(scanner.Bytes())
 		if err != nil {
@@ -247,15 +248,16 @@ func insertPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 			}
 			return
 		}
+		queries = append(queries, query)
+	}
 
-		err = insertPoint(query)
-		if err != nil {
-			log.Error(err)
-			if err0 := write400Error(w, err.Error()); err0 != nil {
-				log.Error(err0)
-			}
-			return
+	err := insertPoints(queries)
+	if err != nil {
+		log.Error(err)
+		if err0 := write400Error(w, err.Error()); err0 != nil {
+			log.Error(err0)
 		}
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)

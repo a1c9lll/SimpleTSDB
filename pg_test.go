@@ -63,8 +63,8 @@ func TestInvalidTags(t *testing.T) {
 }
 
 func TestInvalidMetricNameIninsertPoint(t *testing.T) {
-	if err := insertPoint(&insertPointQuery{
-		Metric: " a b",
+	if err := insertPoints([]*insertPointQuery{
+		{Metric: " a b"},
 	}); err == nil {
 		t.Fatal("expected error")
 	} else if err != errUnsupportedMetricName {
@@ -88,12 +88,6 @@ func TestMetricRequired(t *testing.T) {
 	} else if err != errMetricRequired {
 		t.Fatalf("wrong error: %s", err)
 	}
-
-	if err := insertPoint(&insertPointQuery{}); err == nil {
-		t.Fatal("expected error")
-	} else if err != errMetricRequired {
-		t.Fatalf("wrong error: %s", err)
-	}
 }
 
 func TestMetricExists(t *testing.T) {
@@ -107,7 +101,7 @@ func TestMetricExists(t *testing.T) {
 }
 
 func TestInsertPointAndQuery(t *testing.T) {
-	for _, pt := range []*insertPointQuery{
+	pts := []*insertPointQuery{
 		{
 			Metric: "test0",
 			Tags: map[string]string{
@@ -141,11 +135,10 @@ func TestInsertPointAndQuery(t *testing.T) {
 				Timestamp: time.Now().UnixNano(),
 			},
 		},
-	} {
-		err := insertPoint(pt)
-		if err != nil {
-			t.Fatal(err)
-		}
+	}
+	err := insertPoints(pts)
+	if err != nil {
+		t.Fatal(err)
 	}
 	points, err := queryPoints(&pointsQuery{
 		Metric: "test0",
@@ -173,8 +166,9 @@ func TestDeletePoints(t *testing.T) {
 	}
 
 	baseTime := time.Now().Add(-time.Minute * 50)
+	pts := []*insertPointQuery{}
 	for i := 0; i < 10; i++ {
-		err := insertPoint(&insertPointQuery{
+		pts = append(pts, &insertPointQuery{
 			Metric: "test9",
 			Tags: map[string]string{
 				"id": "1",
@@ -184,9 +178,11 @@ func TestDeletePoints(t *testing.T) {
 				Timestamp: baseTime.Add(time.Minute * 5 * time.Duration(i)).UnixNano(),
 			},
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
+	}
+
+	err = insertPoints(pts)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	err = deletePoints(&deletePointsQuery{
@@ -227,24 +223,34 @@ func TestDuplicateInsert(t *testing.T) {
 		t.Fatal(err)
 	}
 	timestamp := time.Now().UnixNano()
-	if err := insertPoint(&insertPointQuery{
-		Metric: "test2",
-		Point: &point{
-			Value:     182599002,
-			Timestamp: timestamp,
+	insertPts := []*insertPointQuery{
+		{
+			Metric: "test2",
+			Point: &point{
+				Value:     182599002,
+				Timestamp: timestamp,
+			},
 		},
-	}); err != nil {
+	}
+	err = insertPoints(insertPts)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := insertPoint(&insertPointQuery{
-		Metric: "test2",
-		Point: &point{
-			Value:     182599002,
-			Timestamp: timestamp,
+
+	insertPts = []*insertPointQuery{
+		{
+			Metric: "test2",
+			Point: &point{
+				Value:     182599002,
+				Timestamp: timestamp,
+			},
 		},
-	}); err != nil {
+	}
+	err = insertPoints(insertPts)
+	if err != nil {
 		t.Fatal(err)
 	}
+
 	pts, err := queryPoints(&pointsQuery{
 		Metric: "test2",
 		Start:  time.Now().Add(-time.Hour).UnixNano(),
@@ -266,8 +272,9 @@ func TestWindowAggregator(t *testing.T) {
 	}
 
 	baseTime := time.Now().Add(-time.Minute * 15)
+	insertPts := []*insertPointQuery{}
 	for i := 0; i < 3; i++ {
-		err := insertPoint(&insertPointQuery{
+		insertPts = append(insertPts, &insertPointQuery{
 			Metric: "test1",
 			Tags: map[string]string{
 				"id": "1",
@@ -277,9 +284,11 @@ func TestWindowAggregator(t *testing.T) {
 				Timestamp: baseTime.Add(time.Minute * 5 * time.Duration(i)).UnixNano(),
 			},
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
+	}
+
+	err = insertPoints(insertPts)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	points, err := queryPoints(&pointsQuery{
