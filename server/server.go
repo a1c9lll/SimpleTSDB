@@ -4,12 +4,13 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"simpletsdb/core"
 	"simpletsdb/datastore"
 	"simpletsdb/util"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/julienschmidt/httprouter"
 )
@@ -54,10 +55,11 @@ Returns 200 on successful request
 Returns 500 on server failure
 */
 func MetricExists(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	log.Infof("metric_exists request from %s", r.RemoteAddr)
 	if err := r.ParseForm(); err != nil {
-		log.Println(err)
+		log.Error(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
-			log.Println(err0)
+			log.Error(err0)
 		}
 		return
 	}
@@ -65,16 +67,16 @@ func MetricExists(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		metric string
 	)
 	if metricForm, ok := r.Form["metric"]; !ok {
-		log.Println("metric_exists: metric is required")
+		log.Error("metric_exists: metric is required")
 		if err := write400Error(w, "metric is required"); err != nil {
-			log.Println(err)
+			log.Error(err)
 		}
 		return
 	} else {
 		if len(metricForm) != 1 {
-			log.Println("metric_exists: only one metric allowed")
+			log.Error("metric_exists: only one metric allowed")
 			if err := write400Error(w, "only one metric allowed"); err != nil {
-				log.Println(err)
+				log.Error(err)
 			}
 			return
 		}
@@ -82,9 +84,9 @@ func MetricExists(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	}
 
 	if exists, err := datastore.MetricExists(metric); err != nil {
-		log.Println(err)
+		log.Error(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
-			log.Println(err0)
+			log.Error(err0)
 		}
 		return
 	} else {
@@ -93,7 +95,7 @@ func MetricExists(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		if err := json.NewEncoder(w).Encode(&MetricExistsResponse{
 			Exists: exists,
 		}); err != nil {
-			log.Println(err)
+			log.Error(err)
 			return
 		}
 	}
@@ -105,20 +107,21 @@ Returns 409 on metrics that already exist
 Returns 200 on successful creation
 */
 func CreateMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	log.Infof("create_metric request from %s", r.RemoteAddr)
 	typeHeader := r.Header.Values("Content-Type")
 
 	if len(typeHeader) != 1 {
-		log.Println("create_metric: content-type not set")
+		log.Error("create_metric: content-type not set")
 		if err0 := write400Error(w, "content-type not set"); err0 != nil {
-			log.Println(err0)
+			log.Error(err0)
 		}
 		return
 	}
 
 	if typeHeader[0] != "application/json" {
-		log.Println("create_metric: content-type must be application/json")
+		log.Error("create_metric: content-type must be application/json")
 		if err0 := write400Error(w, "content-type must be application/json"); err0 != nil {
-			log.Println(err0)
+			log.Error(err0)
 		}
 		return
 	}
@@ -128,9 +131,9 @@ func CreateMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	req := &CreateMetricRequest{}
 
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
-		log.Println(err)
+		log.Error(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
-			log.Println(err0)
+			log.Error(err0)
 		}
 		return
 	}
@@ -138,12 +141,12 @@ func CreateMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	err := datastore.CreateMetric(req.Metric, req.Tags)
 	if err != nil {
 		if err.Error() == "metric already exists" {
-			log.Println("create_metric: metric already exists")
+			log.Error("create_metric: metric already exists")
 			w.WriteHeader(http.StatusConflict)
 		} else {
-			log.Println(err)
+			log.Error(err)
 			if err0 := write400Error(w, err.Error()); err0 != nil {
-				log.Println(err0)
+				log.Error(err0)
 			}
 		}
 		return
@@ -158,20 +161,22 @@ Returns 404 on metrics that don't exist
 Returns 200 on successful deletion
 */
 func DeleteMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	log.Infof("delete_metric request from %s", r.RemoteAddr)
+
 	typeHeader := r.Header.Values("Content-Type")
 
 	if len(typeHeader) != 1 {
-		log.Println("delete_metric: content-type not set")
+		log.Error("delete_metric: content-type not set")
 		if err0 := write400Error(w, "content-type not set"); err0 != nil {
-			log.Println(err0)
+			log.Error(err0)
 		}
 		return
 	}
 
 	if typeHeader[0] != "application/json" {
-		log.Println("delete_metric: content-type must be application/json")
+		log.Error("delete_metric: content-type must be application/json")
 		if err0 := write400Error(w, "content-type must be application/json"); err0 != nil {
-			log.Println(err0)
+			log.Error(err0)
 		}
 		return
 	}
@@ -181,9 +186,9 @@ func DeleteMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	req := &DeleteMetricRequest{}
 
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
-		log.Println(err)
+		log.Error(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
-			log.Println(err0)
+			log.Error(err0)
 		}
 		return
 	}
@@ -191,12 +196,12 @@ func DeleteMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	err := datastore.DeleteMetric(req.Metric)
 	if err != nil {
 		if err.Error() == "metric does not exist" {
-			log.Println("delete_metric: metric does not exist")
+			log.Error("delete_metric: metric does not exist")
 			w.WriteHeader(http.StatusNotFound)
 		} else {
-			log.Println(err)
+			log.Error(err)
 			if err0 := write400Error(w, err.Error()); err0 != nil {
-				log.Println(err0)
+				log.Error(err0)
 			}
 		}
 		return
@@ -210,20 +215,22 @@ Returns 400 on invalid request
 Returns 200 on successful insertion
 */
 func InsertPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	log.Infof("insert_points request from %s", r.RemoteAddr)
+
 	typeHeader := r.Header.Values("Content-Type")
 
 	if len(typeHeader) != 1 {
-		log.Println("insert_points: content-type not set")
+		log.Error("insert_points: content-type not set")
 		if err0 := write400Error(w, "content-type not set"); err0 != nil {
-			log.Println(err0)
+			log.Error(err0)
 		}
 		return
 	}
 
 	if typeHeader[0] != "text/plain" {
-		log.Println("insert_points: content-type must be text/plain")
+		log.Error("insert_points: content-type must be text/plain")
 		if err0 := write400Error(w, "content-type must be text/plain"); err0 != nil {
-			log.Println(err0)
+			log.Error(err0)
 		}
 		return
 	}
@@ -237,18 +244,18 @@ func InsertPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	for scanner.Scan() {
 		query, err := util.ParseLine(scanner.Bytes())
 		if err != nil {
-			log.Println(err)
+			log.Error(err)
 			if err0 := write400Error(w, err.Error()); err0 != nil {
-				log.Println(err0)
+				log.Error(err0)
 			}
 			return
 		}
 
 		err = datastore.InsertPoint(query)
 		if err != nil {
-			log.Println(err)
+			log.Error(err)
 			if err0 := write400Error(w, err.Error()); err0 != nil {
-				log.Println(err0)
+				log.Error(err0)
 			}
 			return
 		}
@@ -262,20 +269,22 @@ Returns 400 on invalid request
 Returns 200 on successful query
 */
 func QueryPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	log.Infof("query_points request from %s", r.RemoteAddr)
+
 	typeHeader := r.Header.Values("Content-Type")
 
 	if len(typeHeader) != 1 {
-		log.Println("query_points: content-type not set")
+		log.Error("query_points: content-type not set")
 		if err0 := write400Error(w, "content-type not set"); err0 != nil {
-			log.Println(err0)
+			log.Error(err0)
 		}
 		return
 	}
 
 	if typeHeader[0] != "application/json" {
-		log.Println("query_points: content-type must be application/json")
+		log.Error("query_points: content-type must be application/json")
 		if err0 := write400Error(w, "content-type must be application/json"); err0 != nil {
-			log.Println(err0)
+			log.Error(err0)
 		}
 		return
 	}
@@ -285,9 +294,9 @@ func QueryPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	req := &core.PointsQuery{}
 
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
-		log.Println(err)
+		log.Error(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
-			log.Println(err0)
+			log.Error(err0)
 		}
 		return
 	}
@@ -295,9 +304,9 @@ func QueryPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	points, err := datastore.QueryPoints(req)
 
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
-			log.Println(err0)
+			log.Error(err0)
 		}
 		return
 	}
@@ -305,7 +314,7 @@ func QueryPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(points); err != nil {
-		log.Println(err)
+		log.Error(err)
 	}
 }
 
@@ -315,20 +324,22 @@ Returns 404 on metrics that don't exist
 Returns 200 on successful deletion
 */
 func DeletePoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	log.Infof("delete_points request from %s", r.RemoteAddr)
+
 	typeHeader := r.Header.Values("Content-Type")
 
 	if len(typeHeader) != 1 {
-		log.Println("delete_points: content-type not set")
+		log.Error("delete_points: content-type not set")
 		if err0 := write400Error(w, "content-type not set"); err0 != nil {
-			log.Println(err0)
+			log.Error(err0)
 		}
 		return
 	}
 
 	if typeHeader[0] != "application/json" {
-		log.Println("delete_points: content-type must be application/json")
+		log.Error("delete_points: content-type must be application/json")
 		if err0 := write400Error(w, "content-type must be application/json"); err0 != nil {
-			log.Println(err0)
+			log.Error(err0)
 		}
 		return
 	}
@@ -337,17 +348,17 @@ func DeletePoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
 	req := &core.DeletePointsQuery{}
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
-		log.Println(err)
+		log.Error(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
-			log.Println(err0)
+			log.Error(err0)
 		}
 		return
 	}
 
 	if err := datastore.DeletePoints(req); err != nil {
-		log.Println(err)
+		log.Error(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
-			log.Println(err0)
+			log.Error(err0)
 		}
 		return
 	}
