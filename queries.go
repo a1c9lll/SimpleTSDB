@@ -20,7 +20,9 @@ var (
 	errStartRequired               = errors.New("query start is required")
 	errEndRequired                 = errors.New("query end is required")
 	errStringDuplicate             = `pq: duplicate key value violates unique constraint "simpletsdb_%s_timestamp_value_key"`
+	errPgTableNotExist             = `pq: relation "simpletsdb_%s" does not exist`
 	errPointRequiredForInsertQuery = errors.New("point required for insert query")
+	errSameMetricRequiredForInsert = errors.New("all metric names must be the same in an insert")
 )
 
 func generateMetricQuery(name string, tags []string) (string, error) {
@@ -105,7 +107,7 @@ func deleteMetric(name string) error {
 	return nil
 }
 
-func generatePointInsertionStringsAndValues(queries []*insertPointQuery) (string, string, []interface{}, error) {
+func generatePointInsertionStringsAndValues(queries []*insertPointQuery, firstMetric string) (string, string, []interface{}, error) {
 	tagsStrBuilder, valuesStrBuilder := &strings.Builder{}, &strings.Builder{}
 	values := []interface{}{}
 
@@ -123,6 +125,9 @@ func generatePointInsertionStringsAndValues(queries []*insertPointQuery) (string
 
 	var i = 1
 	for z, query := range queries {
+		if query.Metric != firstMetric {
+			return "", "", nil, errSameMetricRequiredForInsert
+		}
 		if !metricAndTagsRe.MatchString(query.Metric) {
 			return "", "", nil, errUnsupportedMetricName
 		}
@@ -156,16 +161,23 @@ Must all be the same metric name
 Must not be duplicates of (timestamp, value)
 */
 func insertPoints(queries0 []*insertPointQuery) error {
+	if len(queries0) == 0 {
+		return nil
+	}
 	// batch the queries 200 at a time to get around
 	// max insert limit of postgres
+	firstMetric := queries0[0].Metric
 	for i := 0; i < len(queries0); i += 200 {
 		queries := queries0[i:min1(i+200, len(queries0))]
-		tagsStr, valuesStr, values, err := generatePointInsertionStringsAndValues(queries)
+		tagsStr, valuesStr, values, err := generatePointInsertionStringsAndValues(queries, firstMetric)
 		if err != nil {
 			return err
 		}
-		queryStr := fmt.Sprintf(`INSERT INTO simpletsdb_%s (timestamp,%svalue) VALUES %s`, queries[0].Metric, tagsStr, valuesStr)
-		if _, err := session.Exec(queryStr, values...); err != nil && err.Error() != fmt.Sprintf(errStringDuplicate, queries[0].Metric) {
+		queryStr := fmt.Sprintf(`INSERT INTO simpletsdb_%s (timestamp,%svalue) VALUES %s`, firstMetric, tagsStr, valuesStr)
+		if _, err := session.Exec(queryStr, values...); err != nil && err.Error() != fmt.Sprintf(errStringDuplicate, firstMetric) {
+			if err.Error() == fmt.Sprintf(errPgTableNotExist, firstMetric) {
+				return errMetricDoesNotExist
+			}
 			return err
 		}
 	}
@@ -233,7 +245,9 @@ func queryPoints(query *pointsQuery) ([]*point, error) {
 		points    []*point
 	)
 	if err != nil {
-		scanner.Close()
+		if err.Error() == fmt.Sprintf(errPgTableNotExist, query.Metric) {
+			return nil, errMetricDoesNotExist
+		}
 		return nil, err
 	}
 	for scanner.Next() {

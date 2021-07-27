@@ -25,6 +25,13 @@ func (p points) Swap(i, j int) {
 	p[i], p[j] = p[j], p[i]
 }
 
+func (p points) MarshalJSON() ([]byte, error) {
+	if len(p) == 0 {
+		return []byte(`[]`), nil
+	}
+	return json.Marshal([]*point(p))
+}
+
 func (p *point) MarshalJSON() ([]byte, error) {
 	buf := &bytes.Buffer{}
 	buf.WriteString(`{"value":`)

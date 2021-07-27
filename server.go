@@ -211,6 +211,7 @@ func deleteMetricHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 /*
 Returns 400 on invalid request
 Returns 200 on successful insertion
+Returns 404 if metric doesn't exist
 */
 func insertPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("insert_points request from %s", r.RemoteAddr)
@@ -253,9 +254,14 @@ func insertPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 
 	err := insertPoints(queries)
 	if err != nil {
-		log.Error(err)
-		if err0 := write400Error(w, err.Error()); err0 != nil {
-			log.Error(err0)
+		if err == errMetricDoesNotExist {
+			log.Println(err)
+			w.WriteHeader(404)
+		} else {
+			log.Error(err)
+			if err0 := write400Error(w, err.Error()); err0 != nil {
+				log.Error(err0)
+			}
 		}
 		return
 	}
@@ -266,6 +272,7 @@ func insertPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 /*
 Returns 400 on invalid request
 Returns 200 on successful query
+Returns 404 if metric doesn't exist
 */
 func queryPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("query_points request from %s", r.RemoteAddr)
@@ -300,19 +307,25 @@ func queryPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 		return
 	}
 
-	points, err := queryPoints(req)
+	pts, err := queryPoints(req)
 
 	if err != nil {
-		log.Error(err)
-		if err0 := write400Error(w, err.Error()); err0 != nil {
-			log.Error(err0)
+		if err.Error() == "metric does not exist" {
+			log.Error(err)
+			w.WriteHeader(404)
+		} else {
+			log.Error(err)
+			if err0 := write400Error(w, err.Error()); err0 != nil {
+				log.Error(err0)
+			}
 		}
 		return
 	}
 
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(points); err != nil {
+
+	if err := json.NewEncoder(w).Encode(points(pts)); err != nil {
 		log.Error(err)
 	}
 }

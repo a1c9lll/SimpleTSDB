@@ -265,6 +265,18 @@ func TestDuplicateInsert(t *testing.T) {
 	}
 }
 
+func TestQueryNonexistentMetric(t *testing.T) {
+	_, err := queryPoints(&pointsQuery{
+		Metric: "ajd29jfj",
+		Start:  mustParseTime("2000-01-01T00:00:00Z").UnixNano(),
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	} else if err.Error() != `metric does not exist` {
+		t.Fatal("wrong error")
+	}
+}
+
 func TestWindowAggregator(t *testing.T) {
 	err := createMetric("test1", []string{"id"})
 	if err != nil {
