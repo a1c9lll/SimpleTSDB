@@ -248,7 +248,7 @@ func TestInsertPointsHandler(t *testing.T) {
 	body := &bytes.Buffer{}
 	body.WriteString(fmt.Sprintf("test6,id=28084 type=high,18765003.4 %d\n", baseTime.UnixNano()))
 	body.WriteString(fmt.Sprintf("test6,id=28084 type=high,18581431.53 %d\n", baseTime.Add(time.Minute).UnixNano()))
-	body.WriteString(fmt.Sprintf("test6,id=28084 type=high,null %d\n", baseTime.Add(time.Minute*2).UnixNano()))
+	body.WriteString(fmt.Sprintf("test6,id=28084 type=high,18532847.21 %d\n", baseTime.Add(time.Minute*2).UnixNano()))
 
 	req = httptest.NewRequest("POST", "/insert_points", body)
 	req.Header.Add("Content-Type", "application/x.simpletsdb.points")
@@ -277,7 +277,7 @@ func TestInsertPointsHandler(t *testing.T) {
 	require.Equal(t, []*point{
 		{Value: 18765003.4, Timestamp: 946684800000000000},
 		{Value: 18581431.53, Timestamp: 946684860000000000},
-		{Value: 0, Timestamp: 946684920000000000, Null: true},
+		{Value: 18532847.21, Timestamp: 946684920000000000},
 	}, pts)
 }
 
@@ -291,7 +291,7 @@ func TestQueryPointsHandler(t *testing.T) {
 	queries = append(queries, ptQ1)
 	ptQ2, _ := parseLine([]byte(fmt.Sprintf("test6,id=28084 type=high,18581431.53 %d\n", baseTime.Add(time.Minute).UnixNano())))
 	queries = append(queries, ptQ2)
-	ptQ3, _ := parseLine([]byte(fmt.Sprintf("test6,id=28084 type=high,null %d\n", baseTime.Add(time.Minute*2).UnixNano())))
+	ptQ3, _ := parseLine([]byte(fmt.Sprintf("test6,id=28084 type=high,18631954.11 %d\n", baseTime.Add(time.Minute*2).UnixNano())))
 	queries = append(queries, ptQ3)
 	err := insertPoints(queries)
 	if err != nil {
@@ -329,7 +329,7 @@ func TestQueryPointsHandler(t *testing.T) {
 	require.Equal(t, []*point{
 		{Value: 18765003.4, Timestamp: 946684800000000000},
 		{Value: 18581431.53, Timestamp: 946684860000000000},
-		{Null: true, Timestamp: 946684920000000000},
+		{Value: 18631954.11, Timestamp: 946684920000000000},
 	}, respPoints)
 }
 

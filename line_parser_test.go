@@ -40,22 +40,6 @@ func TestLineParser(t *testing.T) {
 		},
 	}, insert)
 
-	insert, err = parseLine([]byte(`test0,,null 138456387`))
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	require.Equal(t, &insertPointQuery{
-		Metric: "test0",
-		Tags:   map[string]string{},
-		Point: &point{
-			Value:     0,
-			Timestamp: 138456387,
-			Null:      true,
-		},
-	}, insert)
-
 	_, err = parseLine([]byte(`111`))
 
 	if err == nil {

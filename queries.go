@@ -125,11 +125,8 @@ func generatePointInsertionStringsAndValues(query *insertPointQuery) (string, st
 		i++
 		values = append(values, v)
 	}
-	if query.Point.Null {
-		values = append(values, nil)
-	} else {
-		values = append(values, query.Point.Value)
-	}
+	values = append(values, query.Point.Value)
+
 	return tagsStrBuilder.String(), valuesStrBuilder.String(), values, nil
 }
 
@@ -250,7 +247,7 @@ func queryPoints(query *pointsQuery) ([]*point, error) {
 
 	scanner, err := session.Query(queryStr, queryVals...)
 	var (
-		value     interface{}
+		value     float64
 		timestamp int64
 		points    []*point
 	)
@@ -264,18 +261,10 @@ func queryPoints(query *pointsQuery) ([]*point, error) {
 			scanner.Close()
 			return nil, err
 		}
-		if value == nil {
-			points = append(points, &point{
-				Value:     0,
-				Timestamp: timestamp,
-				Null:      true,
-			})
-		} else {
-			points = append(points, &point{
-				Value:     value.(float64),
-				Timestamp: timestamp,
-			})
-		}
+		points = append(points, &point{
+			Value:     value,
+			Timestamp: timestamp,
+		})
 	}
 
 	if err := scanner.Err(); err != nil {
