@@ -1,8 +1,10 @@
 # SimpleTSDB
 
+## Using curl to test the database
+
 #### Create a metric
 
-```curl
+```bash
 curl --header "Content-Type: application/json" \
   --request POST \
   --data '{"metric":"test0","tags":["id","type"]}' \
@@ -11,7 +13,7 @@ curl --header "Content-Type: application/json" \
 
 #### Check if a metric exists
 
-```curl
+```bash
 curl http://127.0.0.1:8981/metric_exists?metric=test0
 ```
 
@@ -22,7 +24,7 @@ Response:
 
 #### Insert a point
 
-```curl
+```bash
 curl --header "Content-Type: application/x.simpletsdb.points" \
   --request POST \
   --data 'test0,id=1 type=high,123 946684800000000000' \
@@ -31,7 +33,7 @@ curl --header "Content-Type: application/x.simpletsdb.points" \
 
 #### Query points
 
-```curl
+```bash
 curl --header "Content-Type: application/json" \
   --request POST \
   --data '{"metric":"test0","start":946684800000000000,"tags":{"id":"1"}}' \
