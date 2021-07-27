@@ -13,7 +13,11 @@ var (
 )
 
 func InitDB(pgUser, pgPassword, pgHost string, pgPort int, pgDB, pgSSLMode string) {
-	connStr0 := fmt.Sprintf("user=%s password='%s' host='%s' port=%d sslmode=%s", pgUser, pgPassword, pgHost, pgPort, pgSSLMode)
+	var passwordString string
+	if pgPassword != "" {
+		passwordString = fmt.Sprintf("password='%s' ", pgPassword)
+	}
+	connStr0 := fmt.Sprintf("user=%s %shost='%s' port=%d sslmode=%s", pgUser, passwordString, pgHost, pgPort, pgSSLMode)
 	var err error
 	session, err = sql.Open("postgres", connStr0)
 	if err != nil {
@@ -27,7 +31,7 @@ func InitDB(pgUser, pgPassword, pgHost string, pgPort int, pgDB, pgSSLMode strin
 		log.Fatal(err)
 	}
 
-	connStr := fmt.Sprintf("user=%s password='%s' host='%s' port=%d dbname=%s sslmode=%s", pgUser, pgPassword, pgHost, pgPort, pgDB, pgSSLMode)
+	connStr := fmt.Sprintf("user=%s %shost='%s' port=%d dbname=%s sslmode=%s", pgUser, passwordString, pgHost, pgPort, pgDB, pgSSLMode)
 	session, err = sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatal(err)

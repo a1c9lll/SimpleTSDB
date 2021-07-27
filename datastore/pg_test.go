@@ -19,7 +19,11 @@ func TestMain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	InitDB(cfg["postgres_username"], cfg["postgres_password"], cfg["postgres_host"], port, cfg["postgres_db"]+"_test", cfg["postgres_ssl_mode"])
+	var pgPassword string
+	if p, ok := cfg["postgres_password"]; ok {
+		pgPassword = p
+	}
+	InitDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], port, cfg["postgres_db"]+"_test", cfg["postgres_ssl_mode"])
 
 	DeleteMetric("test0")
 	DeleteMetric("test1")

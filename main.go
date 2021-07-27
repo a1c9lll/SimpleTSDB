@@ -22,9 +22,6 @@ func main() {
 	if v, ok := cfg["postgres_username"]; v == "" || !ok {
 		log.Fatal("postgres_username config is required")
 	}
-	if v, ok := cfg["postgres_username"]; v == "" || !ok {
-		log.Fatal("postgres_password config is required")
-	}
 	if v, ok := cfg["postgres_ssl_mode"]; v == "" || !ok {
 		log.Fatal("postgres_ssl_mode config is required")
 	}
@@ -38,11 +35,16 @@ func main() {
 		log.Fatal("postgres_db config is required")
 	}
 
+	var pgPassword string
+	if p, ok := cfg["postgres_password"]; ok {
+		pgPassword = p
+	}
+
 	dbPort, err := strconv.Atoi(cfg["postgres_port"])
 	if err != nil {
 		log.Fatal(err)
 	}
-	datastore.InitDB(cfg["postgres_username"], cfg["postgres_password"], cfg["postgres_host"], dbPort, cfg["postgres_db"], cfg["postgres_ssl_mode"])
+	datastore.InitDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], dbPort, cfg["postgres_db"], cfg["postgres_ssl_mode"])
 
 	log.Infof("Connected to database [%s] at %s:%d", cfg["postgres_db"], cfg["postgres_host"], dbPort)
 	// init server
