@@ -287,12 +287,11 @@ func TestQueryPointsHandler(t *testing.T) {
 	createMetric("test6", []string{"id", "type"})
 	queries := []*insertPointQuery{}
 	baseTime := mustParseTime("2000-01-01T00:00:00Z")
-	ptQ1, _ := parseLine([]byte(fmt.Sprintf("test6,id=28084 type=high,18765003.4 %d\n", baseTime.UnixNano())))
-	queries = append(queries, ptQ1)
-	ptQ2, _ := parseLine([]byte(fmt.Sprintf("test6,id=28084 type=high,18581431.53 %d\n", baseTime.Add(time.Minute).UnixNano())))
-	queries = append(queries, ptQ2)
-	ptQ3, _ := parseLine([]byte(fmt.Sprintf("test6,id=28084 type=high,18631954.11 %d\n", baseTime.Add(time.Minute*2).UnixNano())))
-	queries = append(queries, ptQ3)
+	vals := []float64{18765003.4, 18581431.53, 18631954.11}
+	for i := 0; i < 3; i++ {
+		pt, _ := parseLine([]byte(fmt.Sprintf("test6,id=28084 type=high,%f %d\n", vals[i], baseTime.Add(time.Minute*time.Duration(i)).UnixNano())))
+		queries = append(queries, pt)
+	}
 	err := insertPoints(queries)
 	if err != nil {
 		t.Fatal(err)
@@ -302,9 +301,14 @@ func TestQueryPointsHandler(t *testing.T) {
 	err = json.NewEncoder(buf).Encode(&pointsQuery{
 		Metric: "test6",
 		Start:  baseTime.UnixNano(),
+		End:    baseTime.Add(time.Minute * 3).UnixNano(),
 		Tags: map[string]string{
 			"id":   "28084",
 			"type": "high",
+		},
+		Window: map[string]interface{}{
+			"every":       "1m",
+			"createEmpty": true,
 		},
 	})
 	if err != nil {
@@ -330,6 +334,7 @@ func TestQueryPointsHandler(t *testing.T) {
 		{Value: 18765003.4, Timestamp: 946684800000000000},
 		{Value: 18581431.53, Timestamp: 946684860000000000},
 		{Value: 18631954.11, Timestamp: 946684920000000000},
+		{Null: true, Timestamp: 946684980000000000},
 	}, respPoints)
 }
 
