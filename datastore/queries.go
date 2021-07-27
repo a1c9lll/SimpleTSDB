@@ -2,6 +2,7 @@ package datastore
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"regexp"
@@ -76,6 +77,7 @@ func MetricExists(name string) (bool, error) {
 	for scanner.Next() {
 		err = scanner.Scan(&name0)
 		if err != nil {
+			scanner.Close()
 			return false, err
 		}
 		if name0 == "simpletsdb_"+name {
@@ -146,7 +148,7 @@ func InsertPoint(query *core.InsertPointQuery) error {
 		return err
 	}
 	queryStr := fmt.Sprintf(`INSERT INTO simpletsdb_%s (timestamp,%svalue) VALUES ($1,%s$%d)`, query.Metric, tagsStr, valuesStr, len(values))
-	if _, err = session.Query(queryStr, values...); err != nil && err.Error() != fmt.Sprintf(errStringDuplicate, query.Metric) {
+	if _, err := session.Query(queryStr, values...); err != nil && err.Error() != fmt.Sprintf(errStringDuplicate, query.Metric) {
 		return err
 	}
 
@@ -177,10 +179,16 @@ func InsertPoints(queries []*core.InsertPointQuery) error {
 			tx.Rollback()
 			return err
 		}
+		var (
+			resp *sql.Rows
+		)
 		queryStr := fmt.Sprintf(`INSERT INTO simpletsdb_%s (timestamp,%svalue) VALUES ($1,%s$%d)`, query.Metric, tagsStr, valuesStr, len(values))
-		if _, err = tx.ExecContext(ctx, queryStr, values...); err != nil && err.Error() != fmt.Sprintf(errStringDuplicate, query.Metric) {
+		if resp, err = tx.QueryContext(ctx, queryStr, values...); err != nil && err.Error() != fmt.Sprintf(errStringDuplicate, query.Metric) {
 			tx.Rollback()
+			resp.Close()
 			return err
+		} else {
+			resp.Close()
 		}
 	}
 	if err := tx.Commit(); err != nil {
@@ -250,11 +258,13 @@ func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
 		points    []*core.Point
 	)
 	if err != nil {
+		scanner.Close()
 		return nil, err
 	}
 	for scanner.Next() {
 		err := scanner.Scan(&timestamp, &value)
 		if err != nil {
+			scanner.Close()
 			return nil, err
 		}
 		if value == nil {
@@ -269,6 +279,10 @@ func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
 				Timestamp: timestamp,
 			})
 		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
 	}
 
 	var (
@@ -338,8 +352,11 @@ func DeletePoints(query *core.DeletePointsQuery) error {
 
 	queryStr := fmt.Sprintf(`DELETE FROM simpletsdb_%s WHERE timestamp >= $1 AND timestamp <= $2%s`, query.Metric, tagStr)
 
-	if _, err := session.Query(queryStr, queryVals...); err != nil {
+	if resp, err := session.Query(queryStr, queryVals...); err != nil {
+		resp.Close()
 		return nil
+	} else {
+		resp.Close()
 	}
 	return nil
 }

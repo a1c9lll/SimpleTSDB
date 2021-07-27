@@ -26,6 +26,7 @@ func InitDB(pgUser, pgPassword, pgHost string, pgPort int, pgDB, pgSSLMode strin
 	if err := session.Close(); err != nil {
 		log.Fatal(err)
 	}
+
 	connStr := fmt.Sprintf("user=%s password='%s' host='%s' port=%d dbname=%s sslmode=%s", pgUser, pgPassword, pgHost, pgPort, pgDB, pgSSLMode)
 	session, err = sql.Open("postgres", connStr)
 	if err != nil {
