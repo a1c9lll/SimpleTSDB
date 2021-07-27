@@ -32,7 +32,7 @@ import (
 
 var re *regexp.Regexp = regexp.MustCompile("[#].*\\n|\\s+\\n|\\S+[=]|.*\n")
 
-func LoadConfig(filename string, dest map[string]string) error {
+func loadConfig(filename string, dest map[string]string) error {
 	fi, err := os.Stat(filename)
 	if err != nil {
 		return err

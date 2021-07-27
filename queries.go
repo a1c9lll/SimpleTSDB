@@ -35,7 +35,7 @@ func generateMetricQuery(name string, tags []string) (string, error) {
 	return fmt.Sprintf(`CREATE TABLE simpletsdb_%s (timestamp bigint,%svalue double precision,UNIQUE(timestamp,value))`, name, buf.String()), nil
 }
 
-func CreateMetric(name string, tags []string) error {
+func createMetric(name string, tags []string) error {
 	if name == "" {
 		return errMetricRequired
 	}
@@ -55,7 +55,7 @@ func CreateMetric(name string, tags []string) error {
 	return nil
 }
 
-func MetricExists(name string) (bool, error) {
+func metricExists(name string) (bool, error) {
 	if name == "" {
 		return false, errMetricRequired
 	}
@@ -89,7 +89,7 @@ func MetricExists(name string) (bool, error) {
 	return found, nil
 }
 
-func DeleteMetric(name string) error {
+func deleteMetric(name string) error {
 	if name == "" {
 		return errMetricRequired
 	}
@@ -106,7 +106,7 @@ func DeleteMetric(name string) error {
 	return nil
 }
 
-func generatePointInsertionStringsAndValues(query *InsertPointQuery) (string, string, []interface{}, error) {
+func generatePointInsertionStringsAndValues(query *insertPointQuery) (string, string, []interface{}, error) {
 	tagsStrBuilder, valuesStrBuilder := &strings.Builder{}, &strings.Builder{}
 	values := []interface{}{query.Point.Timestamp}
 
@@ -133,7 +133,7 @@ func generatePointInsertionStringsAndValues(query *InsertPointQuery) (string, st
 	return tagsStrBuilder.String(), valuesStrBuilder.String(), values, nil
 }
 
-func InsertPoint(query *InsertPointQuery) error {
+func insertPoint(query *insertPointQuery) error {
 	if query.Metric == "" {
 		return errMetricRequired
 	}
@@ -156,7 +156,7 @@ func InsertPoint(query *InsertPointQuery) error {
 // TODO: Batch the inserts if possible. Although it may be
 //       difficult to keep the insert order with multiple different
 //       metrics being inserted.
-func InsertPoints(queries []*InsertPointQuery) error {
+func insertPoints(queries []*insertPointQuery) error {
 	ctx := context.Background()
 	tx, err := session.BeginTx(ctx, nil)
 	if err != nil {
@@ -210,7 +210,7 @@ func generateTagsQueryString(tags map[string]string, queryVals []interface{}, ar
 	return s.String(), queryVals, argsCounter - 1, nil
 }
 
-func QueryPoints(query *PointsQuery) ([]*Point, error) {
+func queryPoints(query *pointsQuery) ([]*point, error) {
 	if query.Metric == "" {
 		return nil, errMetricRequired
 	}
@@ -252,7 +252,7 @@ func QueryPoints(query *PointsQuery) ([]*Point, error) {
 	var (
 		value     interface{}
 		timestamp int64
-		points    []*Point
+		points    []*point
 	)
 	if err != nil {
 		scanner.Close()
@@ -265,13 +265,13 @@ func QueryPoints(query *PointsQuery) ([]*Point, error) {
 			return nil, err
 		}
 		if value == nil {
-			points = append(points, &Point{
+			points = append(points, &point{
 				Value:     0,
 				Timestamp: timestamp,
 				Null:      true,
 			})
 		} else {
-			points = append(points, &Point{
+			points = append(points, &point{
 				Value:     value.(float64),
 				Timestamp: timestamp,
 			})
@@ -289,7 +289,7 @@ func QueryPoints(query *PointsQuery) ([]*Point, error) {
 	)
 
 	if query.Window != nil {
-		points, err = Window(query.Start, query.End, query.Window, points)
+		points, err = window(query.Start, query.End, query.Window, points)
 		if err != nil {
 			return nil, err
 		}
@@ -317,7 +317,7 @@ func QueryPoints(query *PointsQuery) ([]*Point, error) {
 	return points, nil
 }
 
-func DeletePoints(query *DeletePointsQuery) error {
+func deletePoints(query *deletePointsQuery) error {
 	if query.Metric == "" {
 		return errMetricRequired
 	}

@@ -1,13 +1,13 @@
 package main
 
-func Bucketize(points []*Point) [][]*Point {
+func bucketize(points []*point) [][]*point {
 	if len(points) == 0 {
-		return [][]*Point{}
+		return [][]*point{}
 	}
 
 	var (
 		lastWindow int64
-		buckets    [][]*Point
+		buckets    [][]*point
 		idxStart   int
 		idxEnd     int
 	)

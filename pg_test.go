@@ -13,7 +13,7 @@ import (
 func TestMain(t *testing.T) {
 	log.SetLevel(log.FatalLevel)
 	cfg := map[string]string{}
-	if err := LoadConfig("./config", cfg); err != nil {
+	if err := loadConfig("./config", cfg); err != nil {
 		t.Fatal(err)
 	}
 	port, err := strconv.Atoi(cfg["postgres_port"])
@@ -24,26 +24,26 @@ func TestMain(t *testing.T) {
 	if p, ok := cfg["postgres_password"]; ok {
 		pgPassword = p
 	}
-	InitDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], port, cfg["postgres_db"]+"_test", cfg["postgres_ssl_mode"])
+	initDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], port, cfg["postgres_db"]+"_test", cfg["postgres_ssl_mode"])
 
-	DeleteMetric("test0")
-	DeleteMetric("test1")
-	DeleteMetric("test2")
+	deleteMetric("test0")
+	deleteMetric("test1")
+	deleteMetric("test2")
 
-	err = CreateMetric("test0", []string{"id", "type"})
+	err = createMetric("test0", []string{"id", "type"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	DeleteMetric("test7")
+	deleteMetric("test7")
 
-	err = CreateMetric("test7", []string{"id", "type"})
+	err = createMetric("test7", []string{"id", "type"})
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestInvalidMetricName(t *testing.T) {
-	err := CreateMetric("a b", []string{})
+	err := createMetric("a b", []string{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -53,7 +53,7 @@ func TestInvalidMetricName(t *testing.T) {
 }
 
 func TestInvalidTags(t *testing.T) {
-	err := CreateMetric("ab", []string{"c d"})
+	err := createMetric("ab", []string{"c d"})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -62,8 +62,8 @@ func TestInvalidTags(t *testing.T) {
 	}
 }
 
-func TestInvalidMetricNameInInsertPoint(t *testing.T) {
-	if err := InsertPoint(&InsertPointQuery{
+func TestInvalidMetricNameIninsertPoint(t *testing.T) {
+	if err := insertPoint(&insertPointQuery{
 		Metric: " a b",
 	}); err == nil {
 		t.Fatal("expected error")
@@ -73,7 +73,7 @@ func TestInvalidMetricNameInInsertPoint(t *testing.T) {
 }
 
 func TestInvalidMetricNameInQuery(t *testing.T) {
-	if _, err := QueryPoints(&PointsQuery{
+	if _, err := queryPoints(&pointsQuery{
 		Metric: " a b",
 	}); err == nil {
 		t.Fatal("expected error")
@@ -83,13 +83,13 @@ func TestInvalidMetricNameInQuery(t *testing.T) {
 }
 
 func TestMetricRequired(t *testing.T) {
-	if _, err := QueryPoints(&PointsQuery{}); err == nil {
+	if _, err := queryPoints(&pointsQuery{}); err == nil {
 		t.Fatal("expected error")
 	} else if err != errMetricRequired {
 		t.Fatalf("wrong error: %s", err)
 	}
 
-	if err := InsertPoint(&InsertPointQuery{}); err == nil {
+	if err := insertPoint(&insertPointQuery{}); err == nil {
 		t.Fatal("expected error")
 	} else if err != errMetricRequired {
 		t.Fatalf("wrong error: %s", err)
@@ -97,7 +97,7 @@ func TestMetricRequired(t *testing.T) {
 }
 
 func TestMetricExists(t *testing.T) {
-	found, err := MetricExists("test0")
+	found, err := metricExists("test0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,14 +107,14 @@ func TestMetricExists(t *testing.T) {
 }
 
 func TestInsertPointAndQuery(t *testing.T) {
-	for _, pt := range []*InsertPointQuery{
+	for _, pt := range []*insertPointQuery{
 		{
 			Metric: "test0",
 			Tags: map[string]string{
 				"id":   "25862",
 				"type": "high",
 			},
-			Point: &Point{
+			Point: &point{
 				Value:     183001000,
 				Timestamp: time.Now().UnixNano(),
 			},
@@ -125,7 +125,7 @@ func TestInsertPointAndQuery(t *testing.T) {
 				"id":   "25862",
 				"type": "low",
 			},
-			Point: &Point{
+			Point: &point{
 				Value:     182599002,
 				Timestamp: time.Now().UnixNano(),
 			},
@@ -136,18 +136,18 @@ func TestInsertPointAndQuery(t *testing.T) {
 				"id":   "25862",
 				"type": "high",
 			},
-			Point: &Point{
+			Point: &point{
 				Value:     183001199,
 				Timestamp: time.Now().UnixNano(),
 			},
 		},
 	} {
-		err := InsertPoint(pt)
+		err := insertPoint(pt)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
-	points, err := QueryPoints(&PointsQuery{
+	points, err := queryPoints(&pointsQuery{
 		Metric: "test0",
 		Tags: map[string]string{
 			"id":   "25862",
@@ -165,12 +165,12 @@ func TestInsertPointAndQuery(t *testing.T) {
 	}
 
 	// insert null point
-	err = InsertPoint(&InsertPointQuery{
+	err = insertPoint(&insertPointQuery{
 		Metric: "test0",
 		Tags: map[string]string{
 			"id": "24987",
 		},
-		Point: &Point{
+		Point: &point{
 			Timestamp: time.Now().UnixNano(),
 			Null:      true,
 		},
@@ -179,7 +179,7 @@ func TestInsertPointAndQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	points, err = QueryPoints(&PointsQuery{
+	points, err = queryPoints(&pointsQuery{
 		Metric: "test0",
 		Tags: map[string]string{
 			"id": "24987",
@@ -204,20 +204,20 @@ func TestInsertPointAndQuery(t *testing.T) {
 }
 
 func TestDeletePoints(t *testing.T) {
-	DeleteMetric("test9")
-	err := CreateMetric("test9", []string{"id"})
+	deleteMetric("test9")
+	err := createMetric("test9", []string{"id"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	baseTime := time.Now().Add(-time.Minute * 50)
 	for i := 0; i < 10; i++ {
-		err := InsertPoint(&InsertPointQuery{
+		err := insertPoint(&insertPointQuery{
 			Metric: "test9",
 			Tags: map[string]string{
 				"id": "1",
 			},
-			Point: &Point{
+			Point: &point{
 				Value:     float64(i),
 				Timestamp: baseTime.Add(time.Minute * 5 * time.Duration(i)).UnixNano(),
 			},
@@ -227,7 +227,7 @@ func TestDeletePoints(t *testing.T) {
 		}
 	}
 
-	err = DeletePoints(&DeletePointsQuery{
+	err = deletePoints(&deletePointsQuery{
 		Metric: "test9",
 		Start:  baseTime.Add(time.Minute * 20).UnixNano(),
 		End:    baseTime.Add(time.Minute * 30).UnixNano(),
@@ -239,7 +239,7 @@ func TestDeletePoints(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	points, err := QueryPoints(&PointsQuery{
+	points, err := queryPoints(&pointsQuery{
 		Metric: "test9",
 		Start:  baseTime.UnixNano(),
 		End:    baseTime.Add(time.Minute * 50).UnixNano(),
@@ -248,7 +248,7 @@ func TestDeletePoints(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	require.Equal(t, []*Point{
+	require.Equal(t, []*point{
 		{Value: 0, Timestamp: baseTime.UnixNano()},
 		{Value: 1, Timestamp: baseTime.Add(time.Minute * 5).UnixNano()},
 		{Value: 2, Timestamp: baseTime.Add(time.Minute * 10).UnixNano()},
@@ -260,30 +260,30 @@ func TestDeletePoints(t *testing.T) {
 }
 
 func TestDuplicateInsert(t *testing.T) {
-	err := CreateMetric("test2", []string{})
+	err := createMetric("test2", []string{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	timestamp := time.Now().UnixNano()
-	if err := InsertPoint(&InsertPointQuery{
+	if err := insertPoint(&insertPointQuery{
 		Metric: "test2",
-		Point: &Point{
+		Point: &point{
 			Value:     182599002,
 			Timestamp: timestamp,
 		},
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := InsertPoint(&InsertPointQuery{
+	if err := insertPoint(&insertPointQuery{
 		Metric: "test2",
-		Point: &Point{
+		Point: &point{
 			Value:     182599002,
 			Timestamp: timestamp,
 		},
 	}); err != nil {
 		t.Fatal(err)
 	}
-	pts, err := QueryPoints(&PointsQuery{
+	pts, err := queryPoints(&pointsQuery{
 		Metric: "test2",
 		Start:  time.Now().Add(-time.Hour).UnixNano(),
 	})
@@ -298,19 +298,19 @@ func TestDuplicateInsert(t *testing.T) {
 }
 
 func TestWindowAggregator(t *testing.T) {
-	err := CreateMetric("test1", []string{"id"})
+	err := createMetric("test1", []string{"id"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	baseTime := time.Now().Add(-time.Minute * 15)
 	for i := 0; i < 3; i++ {
-		err := InsertPoint(&InsertPointQuery{
+		err := insertPoint(&insertPointQuery{
 			Metric: "test1",
 			Tags: map[string]string{
 				"id": "1",
 			},
-			Point: &Point{
+			Point: &point{
 				Value:     float64(i),
 				Timestamp: baseTime.Add(time.Minute * 5 * time.Duration(i)).UnixNano(),
 			},
@@ -320,7 +320,7 @@ func TestWindowAggregator(t *testing.T) {
 		}
 	}
 
-	points, err := QueryPoints(&PointsQuery{
+	points, err := queryPoints(&pointsQuery{
 		Metric: "test1",
 		Tags: map[string]string{
 			"id": "1",
@@ -338,7 +338,7 @@ func TestWindowAggregator(t *testing.T) {
 	startTime := baseTime.UnixNano()
 	windowDur := time.Duration(time.Minute * 5).Nanoseconds()
 	baseAlignedTime := startTime - startTime%windowDur
-	require.Equal(t, []*Point{
+	require.Equal(t, []*point{
 		{Value: 0, Timestamp: baseTime.UnixNano(), Window: baseAlignedTime},
 		{Value: 1, Timestamp: baseTime.Add(time.Minute * 5).UnixNano(), Window: baseAlignedTime + windowDur},
 		{Value: 2, Timestamp: baseTime.Add(time.Minute * 10).UnixNano(), Window: baseAlignedTime + windowDur*2},

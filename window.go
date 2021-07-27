@@ -11,7 +11,7 @@ var (
 	errEveryRequired   = errors.New("every field is required in window aggregator")
 )
 
-func Window(startTime, endTime int64, options map[string]interface{}, points []*Point) ([]*Point, error) {
+func window(startTime, endTime int64, options map[string]interface{}, points []*point) ([]*point, error) {
 	if _, ok := options["every"]; !ok {
 		return nil, errEveryRequired
 	}
@@ -46,7 +46,7 @@ func Window(startTime, endTime int64, options map[string]interface{}, points []*
 
 	// We create a new slice of points if we're filling gaps
 	if createEmpty {
-		newPoints := []*Point{}
+		newPoints := []*point{}
 		windowDur := window.Nanoseconds()
 		currentPoint := 0
 		startWindowTime, endWindowTime := startTime-startTime%windowDur, endTime-endTime%window.Nanoseconds()
@@ -63,7 +63,7 @@ func Window(startTime, endTime int64, options map[string]interface{}, points []*
 				}
 			}
 			if !found {
-				newPoints = append(newPoints, &Point{
+				newPoints = append(newPoints, &point{
 					Value:     0,
 					Timestamp: windowTime,
 					Window:    windowTime,

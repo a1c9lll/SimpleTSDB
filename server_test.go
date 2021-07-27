@@ -16,7 +16,7 @@ func TestMetricExistsHandler(t *testing.T) {
 	req := httptest.NewRequest("GET", "/metric_exists", nil)
 	w := httptest.NewRecorder()
 
-	MetricExistsHandler(w, req, nil)
+	metricExistsHandler(w, req, nil)
 
 	resp := w.Result()
 
@@ -28,7 +28,7 @@ func TestMetricExistsHandler(t *testing.T) {
 		t.Fatal()
 	}
 
-	resp0 := &ServerError{}
+	resp0 := &serverError{}
 	if err := json.NewDecoder(resp.Body).Decode(resp0); err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestMetricExistsHandler(t *testing.T) {
 	req = httptest.NewRequest("GET", "/metric_exists?metric=test7", nil)
 	w = httptest.NewRecorder()
 
-	MetricExistsHandler(w, req, nil)
+	metricExistsHandler(w, req, nil)
 
 	resp = w.Result()
 
@@ -49,12 +49,12 @@ func TestMetricExistsHandler(t *testing.T) {
 		t.Fatal()
 	}
 
-	resp1 := &MetricExistsResponse{}
+	resp1 := &metricExistsResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(resp1); err != nil {
 		t.Fatal(err)
 	}
 
-	require.Equal(t, &MetricExistsResponse{
+	require.Equal(t, &metricExistsResponse{
 		Exists: true,
 	}, resp1)
 
@@ -62,7 +62,7 @@ func TestMetricExistsHandler(t *testing.T) {
 	req = httptest.NewRequest("GET", "/metric_exists?metric=test999x", nil)
 	w = httptest.NewRecorder()
 
-	MetricExistsHandler(w, req, nil)
+	metricExistsHandler(w, req, nil)
 
 	resp = w.Result()
 
@@ -70,12 +70,12 @@ func TestMetricExistsHandler(t *testing.T) {
 		t.Fatal()
 	}
 
-	resp2 := &MetricExistsResponse{}
+	resp2 := &metricExistsResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(resp2); err != nil {
 		t.Fatal(err)
 	}
 
-	require.Equal(t, &MetricExistsResponse{
+	require.Equal(t, &metricExistsResponse{
 		Exists: false,
 	}, resp2)
 }
@@ -83,7 +83,7 @@ func TestMetricExistsHandler(t *testing.T) {
 func TestCreateMetricHandler(t *testing.T) {
 	// test without content-type set
 	body := &bytes.Buffer{}
-	err := json.NewEncoder(body).Encode(&CreateMetricRequest{
+	err := json.NewEncoder(body).Encode(&createMetricRequest{
 		Metric: "test0",
 		Tags:   []string{"id", "type"},
 	})
@@ -93,7 +93,7 @@ func TestCreateMetricHandler(t *testing.T) {
 	req := httptest.NewRequest("POST", "/create_metric", body)
 	w := httptest.NewRecorder()
 
-	CreateMetricHandler(w, req, nil)
+	createMetricHandler(w, req, nil)
 
 	resp := w.Result()
 
@@ -101,17 +101,17 @@ func TestCreateMetricHandler(t *testing.T) {
 		t.Fatal()
 	}
 
-	serverError := &ServerError{}
+	serverError := &serverError{}
 	json.NewDecoder(resp.Body).Decode(serverError)
 	if serverError.Error != "content-type not set" {
 		t.Fatal()
 	}
 
 	// test valid request where metric already exists
-	CreateMetric("test8", []string{"id", "type"})
+	createMetric("test8", []string{"id", "type"})
 
 	body = &bytes.Buffer{}
-	err = json.NewEncoder(body).Encode(&CreateMetricRequest{
+	err = json.NewEncoder(body).Encode(&createMetricRequest{
 		Metric: "test8",
 		Tags:   []string{"id", "type"},
 	})
@@ -124,7 +124,7 @@ func TestCreateMetricHandler(t *testing.T) {
 
 	w = httptest.NewRecorder()
 
-	CreateMetricHandler(w, req, nil)
+	createMetricHandler(w, req, nil)
 
 	resp = w.Result()
 
@@ -133,10 +133,10 @@ func TestCreateMetricHandler(t *testing.T) {
 	}
 
 	// test valid request
-	DeleteMetric("test4")
+	deleteMetric("test4")
 
 	body = &bytes.Buffer{}
-	err = json.NewEncoder(body).Encode(&CreateMetricRequest{
+	err = json.NewEncoder(body).Encode(&createMetricRequest{
 		Metric: "test4",
 		Tags:   []string{"id", "type"},
 	})
@@ -149,7 +149,7 @@ func TestCreateMetricHandler(t *testing.T) {
 
 	w = httptest.NewRecorder()
 
-	CreateMetricHandler(w, req, nil)
+	createMetricHandler(w, req, nil)
 
 	resp = w.Result()
 
@@ -160,10 +160,10 @@ func TestCreateMetricHandler(t *testing.T) {
 
 func TestDeleteMetricHandler(t *testing.T) {
 	// test without content-type set
-	CreateMetric("test5", []string{})
+	createMetric("test5", []string{})
 
 	body := &bytes.Buffer{}
-	err := json.NewEncoder(body).Encode(&DeleteMetricRequest{
+	err := json.NewEncoder(body).Encode(&deleteMetricRequest{
 		Metric: "test5",
 	})
 	if err != nil {
@@ -172,7 +172,7 @@ func TestDeleteMetricHandler(t *testing.T) {
 	req := httptest.NewRequest("DELETE", "/delete_metric", body)
 	w := httptest.NewRecorder()
 
-	DeleteMetricHandler(w, req, nil)
+	deleteMetricHandler(w, req, nil)
 
 	resp := w.Result()
 
@@ -180,7 +180,7 @@ func TestDeleteMetricHandler(t *testing.T) {
 		t.Fatal()
 	}
 
-	serverError := &ServerError{}
+	serverError := &serverError{}
 	json.NewDecoder(resp.Body).Decode(serverError)
 	if serverError.Error != "content-type not set" {
 		t.Fatal()
@@ -188,7 +188,7 @@ func TestDeleteMetricHandler(t *testing.T) {
 
 	// test valid request
 	body = &bytes.Buffer{}
-	err = json.NewEncoder(body).Encode(&DeleteMetricRequest{
+	err = json.NewEncoder(body).Encode(&deleteMetricRequest{
 		Metric: "test5",
 	})
 	if err != nil {
@@ -199,7 +199,7 @@ func TestDeleteMetricHandler(t *testing.T) {
 
 	w = httptest.NewRecorder()
 
-	DeleteMetricHandler(w, req, nil)
+	deleteMetricHandler(w, req, nil)
 
 	resp = w.Result()
 
@@ -209,7 +209,7 @@ func TestDeleteMetricHandler(t *testing.T) {
 
 	// test request with nonexistent metric
 	body = &bytes.Buffer{}
-	err = json.NewEncoder(body).Encode(&DeleteMetricRequest{
+	err = json.NewEncoder(body).Encode(&deleteMetricRequest{
 		Metric: "test999z",
 	})
 	if err != nil {
@@ -220,7 +220,7 @@ func TestDeleteMetricHandler(t *testing.T) {
 
 	w = httptest.NewRecorder()
 
-	DeleteMetricHandler(w, req, nil)
+	deleteMetricHandler(w, req, nil)
 
 	resp = w.Result()
 
@@ -233,7 +233,7 @@ func TestInsertPointsHandler(t *testing.T) {
 	// test invalid query
 	req := httptest.NewRequest("POST", "/insert_points", nil)
 	w := httptest.NewRecorder()
-	InsertPointsHandler(w, req, nil)
+	insertPointsHandler(w, req, nil)
 
 	resp := w.Result()
 
@@ -241,10 +241,10 @@ func TestInsertPointsHandler(t *testing.T) {
 		t.Fatal()
 	}
 	// test valid query
-	DeleteMetric("test6")
-	CreateMetric("test6", []string{"id", "type"})
+	deleteMetric("test6")
+	createMetric("test6", []string{"id", "type"})
 
-	baseTime := MustParseTime("2000-01-01T00:00:00Z")
+	baseTime := mustParseTime("2000-01-01T00:00:00Z")
 	body := &bytes.Buffer{}
 	body.WriteString(fmt.Sprintf("test6,id=28084 type=high,18765003.4 %d\n", baseTime.UnixNano()))
 	body.WriteString(fmt.Sprintf("test6,id=28084 type=high,18581431.53 %d\n", baseTime.Add(time.Minute).UnixNano()))
@@ -255,7 +255,7 @@ func TestInsertPointsHandler(t *testing.T) {
 
 	w = httptest.NewRecorder()
 
-	InsertPointsHandler(w, req, nil)
+	insertPointsHandler(w, req, nil)
 
 	resp = w.Result()
 
@@ -263,7 +263,7 @@ func TestInsertPointsHandler(t *testing.T) {
 		t.Fatal()
 	}
 
-	pts, err := QueryPoints(&PointsQuery{
+	pts, err := queryPoints(&pointsQuery{
 		Metric: "test6",
 		Start:  baseTime.UnixNano(),
 		Tags: map[string]string{
@@ -274,7 +274,7 @@ func TestInsertPointsHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	require.Equal(t, []*Point{
+	require.Equal(t, []*point{
 		{Value: 18765003.4, Timestamp: 946684800000000000},
 		{Value: 18581431.53, Timestamp: 946684860000000000},
 		{Value: 0, Timestamp: 946684920000000000, Null: true},
@@ -283,23 +283,23 @@ func TestInsertPointsHandler(t *testing.T) {
 
 func TestQueryPointsHandler(t *testing.T) {
 	// insert points first
-	DeleteMetric("test6")
-	CreateMetric("test6", []string{"id", "type"})
-	queries := []*InsertPointQuery{}
-	baseTime := MustParseTime("2000-01-01T00:00:00Z")
-	ptQ1, _ := ParseLine([]byte(fmt.Sprintf("test6,id=28084 type=high,18765003.4 %d\n", baseTime.UnixNano())))
+	deleteMetric("test6")
+	createMetric("test6", []string{"id", "type"})
+	queries := []*insertPointQuery{}
+	baseTime := mustParseTime("2000-01-01T00:00:00Z")
+	ptQ1, _ := parseLine([]byte(fmt.Sprintf("test6,id=28084 type=high,18765003.4 %d\n", baseTime.UnixNano())))
 	queries = append(queries, ptQ1)
-	ptQ2, _ := ParseLine([]byte(fmt.Sprintf("test6,id=28084 type=high,18581431.53 %d\n", baseTime.Add(time.Minute).UnixNano())))
+	ptQ2, _ := parseLine([]byte(fmt.Sprintf("test6,id=28084 type=high,18581431.53 %d\n", baseTime.Add(time.Minute).UnixNano())))
 	queries = append(queries, ptQ2)
-	ptQ3, _ := ParseLine([]byte(fmt.Sprintf("test6,id=28084 type=high,null %d\n", baseTime.Add(time.Minute*2).UnixNano())))
+	ptQ3, _ := parseLine([]byte(fmt.Sprintf("test6,id=28084 type=high,null %d\n", baseTime.Add(time.Minute*2).UnixNano())))
 	queries = append(queries, ptQ3)
-	err := InsertPoints(queries)
+	err := insertPoints(queries)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	buf := &bytes.Buffer{}
-	err = json.NewEncoder(buf).Encode(&PointsQuery{
+	err = json.NewEncoder(buf).Encode(&pointsQuery{
 		Metric: "test6",
 		Start:  baseTime.UnixNano(),
 		Tags: map[string]string{
@@ -315,18 +315,18 @@ func TestQueryPointsHandler(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	QueryPointsHandler(w, req, nil)
+	queryPointsHandler(w, req, nil)
 
 	resp := w.Result()
 
-	var respPoints []*Point
+	var respPoints []*point
 	err = json.NewDecoder(resp.Body).Decode(&respPoints)
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	require.Equal(t, []*Point{
+	require.Equal(t, []*point{
 		{Value: 18765003.4, Timestamp: 946684800000000000},
 		{Value: 18581431.53, Timestamp: 946684860000000000},
 		{Null: true, Timestamp: 946684920000000000},
@@ -334,19 +334,19 @@ func TestQueryPointsHandler(t *testing.T) {
 }
 
 func TestDeletePointsHandler(t *testing.T) {
-	DeleteMetric("test10")
-	CreateMetric("test10", []string{"id"})
-	queries := []*InsertPointQuery{}
-	baseTime := MustParseTime("2000-01-01T00:00:00Z")
+	deleteMetric("test10")
+	createMetric("test10", []string{"id"})
+	queries := []*insertPointQuery{}
+	baseTime := mustParseTime("2000-01-01T00:00:00Z")
 	for i := 0; i < 5; i++ {
-		q, _ := ParseLine([]byte(fmt.Sprintf("test10,id=28084,999 %d\n", baseTime.Add(time.Minute*time.Duration(i)).UnixNano())))
+		q, _ := parseLine([]byte(fmt.Sprintf("test10,id=28084,999 %d\n", baseTime.Add(time.Minute*time.Duration(i)).UnixNano())))
 		queries = append(queries, q)
 	}
-	if err := InsertPoints(queries); err != nil {
+	if err := insertPoints(queries); err != nil {
 		t.Fatal(err)
 	}
 	buf := &bytes.Buffer{}
-	if err := json.NewEncoder(buf).Encode(&DeletePointsQuery{
+	if err := json.NewEncoder(buf).Encode(&deletePointsQuery{
 		Metric: "test10",
 		Start:  baseTime.Add(time.Minute).UnixNano(),
 		End:    baseTime.Add(time.Minute * 3).UnixNano(),
@@ -361,7 +361,7 @@ func TestDeletePointsHandler(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	DeletePointsHandler(w, req, nil)
+	deletePointsHandler(w, req, nil)
 
 	resp := w.Result()
 
@@ -369,7 +369,7 @@ func TestDeletePointsHandler(t *testing.T) {
 		t.Fatal()
 	}
 
-	points, err := QueryPoints(&PointsQuery{
+	points, err := queryPoints(&pointsQuery{
 		Metric: "test10",
 		Start:  baseTime.UnixNano(),
 		End:    baseTime.Add(time.Minute * 4).UnixNano(),
@@ -378,7 +378,7 @@ func TestDeletePointsHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	require.Equal(t, []*Point{
+	require.Equal(t, []*point{
 		{Value: 999, Timestamp: baseTime.UnixNano()},
 		{Value: 999, Timestamp: baseTime.Add(time.Minute * 4).UnixNano()},
 	}, points)

@@ -17,7 +17,7 @@ var (
 	errWindowRequiredForStdDev = errors.New("window must be set for stddev aggregator")
 )
 
-func aggregate(aggregator *AggregatorQuery, windowApplied bool, points []*Point) ([]*Point, bool, error) {
+func aggregate(aggregator *aggregatorQuery, windowApplied bool, points []*point) ([]*point, bool, error) {
 	var (
 		windowedAggregatorApplied bool
 		err                       error
@@ -27,31 +27,31 @@ func aggregate(aggregator *AggregatorQuery, windowApplied bool, points []*Point)
 		if !windowApplied {
 			return nil, false, errWindowRequiredForMean
 		}
-		points = Mean(points)
+		points = mean(points)
 		windowedAggregatorApplied = true
 	case "sum":
 		if !windowApplied {
 			return nil, false, errWindowRequiredForSum
 		}
-		points = Sum(points)
+		points = sum(points)
 		windowedAggregatorApplied = true
 	case "min":
 		if !windowApplied {
 			return nil, false, errWindowRequiredForMin
 		}
-		points = Min(points)
+		points = min(points)
 		windowedAggregatorApplied = true
 	case "max":
 		if !windowApplied {
 			return nil, false, errWindowRequiredForMax
 		}
-		points = Max(points)
+		points = max(points)
 		windowedAggregatorApplied = true
 	case "count":
 		if !windowApplied {
 			return nil, false, errWindowRequiredForCount
 		}
-		points, err = Count(aggregator.Options, points)
+		points, err = count(aggregator.Options, points)
 		if err != nil {
 			return nil, false, err
 		}
@@ -60,35 +60,40 @@ func aggregate(aggregator *AggregatorQuery, windowApplied bool, points []*Point)
 		if !windowApplied {
 			return nil, false, errWindowRequiredForFirst
 		}
-		points = First(points)
+		points = first(points)
 		windowedAggregatorApplied = true
 	case "last":
 		if !windowApplied {
 			return nil, false, errWindowRequiredForLast
 		}
-		points = Last(points)
+		points = last(points)
 		windowedAggregatorApplied = true
 	case "median":
 		if !windowApplied {
 			return nil, false, errWindowRequiredForMedian
 		}
-		points = Median(points)
+		points = median(points)
 		windowedAggregatorApplied = true
 	case "mode":
 		if !windowApplied {
 			return nil, false, errWindowRequiredForMode
 		}
-		points = Mode(points)
+		points = mode(points)
 		windowedAggregatorApplied = true
 	case "stddev":
 		if !windowApplied {
 			return nil, false, errWindowRequiredForStdDev
 		}
-		points, err = StdDev(aggregator.Options, points)
+		points, err = stddev(aggregator.Options, points)
 		if err != nil {
 			return nil, false, err
 		}
 		windowedAggregatorApplied = true
+	case "fill":
+		points, err = fill(aggregator.Options, points)
+		if err != nil {
+			return nil, false, err
+		}
 	}
 
 	return points, windowedAggregatorApplied, nil

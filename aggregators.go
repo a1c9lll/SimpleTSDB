@@ -15,17 +15,17 @@ var (
 	errFillValueType       = errors.New("fillValue must be int or float")
 )
 
-func Last(points []*Point) []*Point {
+func last(points []*point) []*point {
 	if len(points) == 0 {
 		return points
 	}
 
 	var (
 		total      int
-		last       *Point
+		last       *point
 		lastWindow int64
 		lastNull   bool
-		lastPoints []*Point
+		lastPoints []*point
 	)
 
 	last = points[0]
@@ -43,7 +43,7 @@ func Last(points []*Point) []*Point {
 				if lastNull {
 					lastPoints = append(lastPoints, points[i-1])
 				} else {
-					lastPoints = append(lastPoints, &Point{
+					lastPoints = append(lastPoints, &point{
 						Value:     last.Value,
 						Timestamp: lastWindow,
 						Window:    lastWindow,
@@ -61,7 +61,7 @@ func Last(points []*Point) []*Point {
 		if lastNull {
 			lastPoints = append(lastPoints, points[len(points)-1])
 		} else {
-			lastPoints = append(lastPoints, &Point{
+			lastPoints = append(lastPoints, &point{
 				Value:     last.Value,
 				Timestamp: lastWindow,
 				Window:    lastWindow,
@@ -72,17 +72,17 @@ func Last(points []*Point) []*Point {
 	return lastPoints
 }
 
-func First(points []*Point) []*Point {
+func first(points []*point) []*point {
 	if len(points) == 0 {
 		return points
 	}
 
 	var (
 		total       int
-		first       *Point
+		first       *point
 		lastWindow  int64
 		lastNull    bool
-		firstPoints []*Point
+		firstPoints []*point
 	)
 
 	first = points[0]
@@ -99,7 +99,7 @@ func First(points []*Point) []*Point {
 				if lastNull {
 					firstPoints = append(firstPoints, points[i-1])
 				} else {
-					firstPoints = append(firstPoints, &Point{
+					firstPoints = append(firstPoints, &point{
 						Value:     first.Value,
 						Timestamp: lastWindow,
 						Window:    lastWindow,
@@ -117,7 +117,7 @@ func First(points []*Point) []*Point {
 		if lastNull {
 			firstPoints = append(firstPoints, points[len(points)-1])
 		} else {
-			firstPoints = append(firstPoints, &Point{
+			firstPoints = append(firstPoints, &point{
 				Value:     first.Value,
 				Timestamp: lastWindow,
 				Window:    lastWindow,
@@ -128,7 +128,7 @@ func First(points []*Point) []*Point {
 	return firstPoints
 }
 
-func Count(options map[string]interface{}, points []*Point) ([]*Point, error) {
+func count(options map[string]interface{}, points []*point) ([]*point, error) {
 	if len(points) == 0 {
 		return points, nil
 	}
@@ -148,7 +148,7 @@ func Count(options map[string]interface{}, points []*Point) ([]*Point, error) {
 		total         int
 		lastWindow    int64
 		lastNull      bool
-		countedPoints []*Point
+		countedPoints []*point
 	)
 
 	lastWindow = points[0].Window
@@ -163,7 +163,7 @@ func Count(options map[string]interface{}, points []*Point) ([]*Point, error) {
 			} else {
 				if lastNull {
 					if countNullPoints {
-						countedPoints = append(countedPoints, &Point{
+						countedPoints = append(countedPoints, &point{
 							Value:     1,
 							Timestamp: points[i-1].Timestamp,
 							Window:    points[i-1].Timestamp,
@@ -173,7 +173,7 @@ func Count(options map[string]interface{}, points []*Point) ([]*Point, error) {
 						countedPoints = append(countedPoints, points[i-1])
 					}
 				} else {
-					countedPoints = append(countedPoints, &Point{
+					countedPoints = append(countedPoints, &point{
 						Value:     float64(total),
 						Timestamp: lastWindow,
 						Window:    lastWindow,
@@ -189,7 +189,7 @@ func Count(options map[string]interface{}, points []*Point) ([]*Point, error) {
 	if total > 0 {
 		if lastNull {
 			if countNullPoints {
-				countedPoints = append(countedPoints, &Point{
+				countedPoints = append(countedPoints, &point{
 					Value:     1,
 					Timestamp: points[len(points)-1].Timestamp,
 					Window:    points[len(points)-1].Timestamp,
@@ -198,7 +198,7 @@ func Count(options map[string]interface{}, points []*Point) ([]*Point, error) {
 				countedPoints = append(countedPoints, points[len(points)-1])
 			}
 		} else {
-			countedPoints = append(countedPoints, &Point{
+			countedPoints = append(countedPoints, &point{
 				Value:     float64(total),
 				Timestamp: lastWindow,
 				Window:    lastWindow,
@@ -209,20 +209,20 @@ func Count(options map[string]interface{}, points []*Point) ([]*Point, error) {
 	return countedPoints, nil
 }
 
-func Max(points []*Point) []*Point {
+func max(points []*point) []*point {
 	if len(points) == 0 {
 		return points
 	}
 
 	var (
 		total       int
-		max0        float64
+		max1        float64
 		lastWindow  int64
 		lastNull    bool
-		maxedPoints []*Point
+		maxedPoints []*point
 	)
 
-	max0 = points[0].Value
+	max1 = points[0].Value
 	lastWindow = points[0].Window
 	total = 1
 	lastNull = points[0].Null
@@ -231,19 +231,19 @@ func Max(points []*Point) []*Point {
 		for i := 1; i < len(points); i++ {
 			pt := points[i]
 			if pt.Window == lastWindow {
-				max0 = max(max0, pt.Value)
+				max1 = max0(max1, pt.Value)
 				total++
 			} else {
 				if lastNull {
 					maxedPoints = append(maxedPoints, points[i-1])
 				} else {
-					maxedPoints = append(maxedPoints, &Point{
-						Value:     max0,
+					maxedPoints = append(maxedPoints, &point{
+						Value:     max1,
 						Timestamp: lastWindow,
 						Window:    lastWindow,
 					})
 				}
-				max0 = pt.Value
+				max1 = pt.Value
 				total = 1
 				lastNull = pt.Null
 			}
@@ -255,8 +255,8 @@ func Max(points []*Point) []*Point {
 		if lastNull {
 			maxedPoints = append(maxedPoints, points[len(points)-1])
 		} else {
-			maxedPoints = append(maxedPoints, &Point{
-				Value:     max0,
+			maxedPoints = append(maxedPoints, &point{
+				Value:     max1,
 				Timestamp: lastWindow,
 				Window:    lastWindow,
 			})
@@ -266,20 +266,20 @@ func Max(points []*Point) []*Point {
 	return maxedPoints
 }
 
-func Min(points []*Point) []*Point {
+func min(points []*point) []*point {
 	if len(points) == 0 {
 		return points
 	}
 
 	var (
 		total        int
-		min0         float64
+		min1         float64
 		lastWindow   int64
 		lastNull     bool
-		minnedPoints []*Point
+		minnedPoints []*point
 	)
 
-	min0 = points[0].Value
+	min1 = points[0].Value
 	lastWindow = points[0].Window
 	total = 1
 	lastNull = points[0].Null
@@ -288,19 +288,19 @@ func Min(points []*Point) []*Point {
 		for i := 1; i < len(points); i++ {
 			pt := points[i]
 			if pt.Window == lastWindow {
-				min0 = min(min0, pt.Value)
+				min1 = min0(min1, pt.Value)
 				total++
 			} else {
 				if lastNull {
 					minnedPoints = append(minnedPoints, points[i-1])
 				} else {
-					minnedPoints = append(minnedPoints, &Point{
-						Value:     min0,
+					minnedPoints = append(minnedPoints, &point{
+						Value:     min1,
 						Timestamp: lastWindow,
 						Window:    lastWindow,
 					})
 				}
-				min0 = pt.Value
+				min1 = pt.Value
 				total = 1
 				lastNull = pt.Null
 			}
@@ -312,8 +312,8 @@ func Min(points []*Point) []*Point {
 		if lastNull {
 			minnedPoints = append(minnedPoints, points[len(points)-1])
 		} else {
-			minnedPoints = append(minnedPoints, &Point{
-				Value:     min0,
+			minnedPoints = append(minnedPoints, &point{
+				Value:     min1,
 				Timestamp: lastWindow,
 				Window:    lastWindow,
 			})
@@ -323,21 +323,21 @@ func Min(points []*Point) []*Point {
 	return minnedPoints
 }
 
-func min(a, b float64) float64 {
+func min0(a, b float64) float64 {
 	if a < b {
 		return a
 	}
 	return b
 }
 
-func max(a, b float64) float64 {
+func max0(a, b float64) float64 {
 	if a > b {
 		return a
 	}
 	return b
 }
 
-func Mean(points []*Point) []*Point {
+func mean(points []*point) []*point {
 	if len(points) == 0 {
 		return points
 	}
@@ -347,7 +347,7 @@ func Mean(points []*Point) []*Point {
 		sum            float64
 		lastWindow     int64
 		lastNull       bool
-		averagedPoints []*Point
+		averagedPoints []*point
 	)
 
 	sum = points[0].Value
@@ -365,7 +365,7 @@ func Mean(points []*Point) []*Point {
 				if lastNull {
 					averagedPoints = append(averagedPoints, points[i-1])
 				} else {
-					averagedPoints = append(averagedPoints, &Point{
+					averagedPoints = append(averagedPoints, &point{
 						Value:     sum / float64(total),
 						Timestamp: lastWindow,
 						Window:    lastWindow,
@@ -383,7 +383,7 @@ func Mean(points []*Point) []*Point {
 		if lastNull {
 			averagedPoints = append(averagedPoints, points[len(points)-1])
 		} else {
-			averagedPoints = append(averagedPoints, &Point{
+			averagedPoints = append(averagedPoints, &point{
 				Value:     sum / float64(total),
 				Timestamp: lastWindow,
 				Window:    lastWindow,
@@ -394,16 +394,16 @@ func Mean(points []*Point) []*Point {
 	return averagedPoints
 }
 
-func Median(points []*Point) []*Point {
-	if len(points) == 0 {
-		return points
+func median(points0 []*point) []*point {
+	if len(points0) == 0 {
+		return points0
 	}
 
-	buckets := Bucketize(points)
-	medianPoints := make([]*Point, len(buckets))
+	buckets := bucketize(points0)
+	medianPoints := make([]*point, len(buckets))
 
 	for i, bucket := range buckets {
-		pts := Points(bucket)
+		pts := points(bucket)
 		if pts[0].Null {
 			medianPoints[i] = pts[0]
 			continue
@@ -415,7 +415,7 @@ func Median(points []*Point) []*Point {
 		} else {
 			median = (pts[(len(pts)/2-1)].Value + pts[len(pts)/2].Value) / 2
 		}
-		medianPoints[i] = &Point{
+		medianPoints[i] = &point{
 			Value:     median,
 			Timestamp: pts[0].Window,
 			Window:    pts[0].Window,
@@ -425,7 +425,7 @@ func Median(points []*Point) []*Point {
 	return medianPoints
 }
 
-func Sum(points []*Point) []*Point {
+func sum(points []*point) []*point {
 	if len(points) == 0 {
 		return points
 	}
@@ -435,7 +435,7 @@ func Sum(points []*Point) []*Point {
 		sum          float64
 		lastWindow   int64
 		lastNull     bool
-		summedPoints []*Point
+		summedPoints []*point
 	)
 
 	sum = points[0].Value
@@ -453,7 +453,7 @@ func Sum(points []*Point) []*Point {
 				if lastNull {
 					summedPoints = append(summedPoints, points[i-1])
 				} else {
-					summedPoints = append(summedPoints, &Point{
+					summedPoints = append(summedPoints, &point{
 						Value:     sum,
 						Timestamp: lastWindow,
 						Window:    lastWindow,
@@ -471,7 +471,7 @@ func Sum(points []*Point) []*Point {
 		if lastNull {
 			summedPoints = append(summedPoints, points[len(points)-1])
 		} else {
-			summedPoints = append(summedPoints, &Point{
+			summedPoints = append(summedPoints, &point{
 				Value:     sum,
 				Timestamp: lastWindow,
 				Window:    lastWindow,
@@ -482,14 +482,14 @@ func Sum(points []*Point) []*Point {
 	return summedPoints
 }
 
-func Mode(points []*Point) []*Point {
-	buckets := Bucketize(points)
-	modePoints := make([]*Point, len(buckets))
+func mode(points []*point) []*point {
+	buckets := bucketize(points)
+	modePoints := make([]*point, len(buckets))
 
 	for i, bucket := range buckets {
 		var (
-			modes  []*Point
-			mode   *Point
+			modes  []*point
+			mode   *point
 			counts = map[float64]int{}
 			max    = -1
 		)
@@ -515,14 +515,14 @@ func Mode(points []*Point) []*Point {
 		}
 
 		if len(modes) == 0 || len(modes) > 1 {
-			modePoints[i] = &Point{
+			modePoints[i] = &point{
 				Value:     0,
 				Timestamp: bucket[0].Window,
 				Window:    bucket[0].Window,
 				Null:      true,
 			}
 		} else {
-			modePoints[i] = &Point{
+			modePoints[i] = &point{
 				Value:     mode.Value,
 				Timestamp: mode.Window,
 				Window:    mode.Window,
@@ -533,7 +533,7 @@ func Mode(points []*Point) []*Point {
 	return modePoints
 }
 
-func StdDev(options map[string]interface{}, points []*Point) ([]*Point, error) {
+func stddev(options map[string]interface{}, points []*point) ([]*point, error) {
 	if len(points) == 0 {
 		return points, nil
 	}
@@ -556,8 +556,8 @@ func StdDev(options map[string]interface{}, points []*Point) ([]*Point, error) {
 		}
 	}
 
-	buckets := Bucketize(points)
-	stdDevedPoints := make([]*Point, len(buckets))
+	buckets := bucketize(points)
+	stdDevedPoints := make([]*point, len(buckets))
 
 	for i, bucket := range buckets {
 		if bucket[0].Null {
@@ -565,7 +565,7 @@ func StdDev(options map[string]interface{}, points []*Point) ([]*Point, error) {
 			continue
 		}
 		if len(bucket) == 1 && sampleStdDev {
-			stdDevedPoints[i] = &Point{
+			stdDevedPoints[i] = &point{
 				Value:     0,
 				Timestamp: bucket[0].Window,
 				Window:    bucket[0].Window,
@@ -595,7 +595,7 @@ func StdDev(options map[string]interface{}, points []*Point) ([]*Point, error) {
 		} else {
 			lenM = float64(len(bucket))
 		}
-		stdDevedPoints[i] = &Point{
+		stdDevedPoints[i] = &point{
 			Value:     math.Sqrt(stdDev / lenM),
 			Timestamp: bucket[0].Window,
 			Window:    bucket[0].Window,
@@ -607,7 +607,7 @@ func StdDev(options map[string]interface{}, points []*Point) ([]*Point, error) {
 
 // fillValue is required even if usePrevious is set incase
 // the first point is null
-func Fill(options map[string]interface{}, points []*Point) ([]*Point, error) {
+func fill(options map[string]interface{}, points []*point) ([]*point, error) {
 	if len(points) == 0 {
 		return points, nil
 	}

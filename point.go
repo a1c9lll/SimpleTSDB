@@ -11,21 +11,21 @@ var (
 	errPointValueType = errors.New("point value must be null or number")
 )
 
-type Points []*Point
+type points []*point
 
-func (p Points) Len() int {
+func (p points) Len() int {
 	return len(p)
 }
 
-func (p Points) Less(i, j int) bool {
+func (p points) Less(i, j int) bool {
 	return p[i].Value < p[j].Value
 }
 
-func (p Points) Swap(i, j int) {
+func (p points) Swap(i, j int) {
 	p[i], p[j] = p[j], p[i]
 }
 
-func (p *Point) MarshalJSON() ([]byte, error) {
+func (p *point) MarshalJSON() ([]byte, error) {
 	buf := &bytes.Buffer{}
 	buf.WriteString(`{"value":`)
 	if p.Null {
@@ -48,7 +48,7 @@ type UnmarshallablePoint struct {
 	Timestamp int64       `json:"timestamp"`
 }
 
-func (p *Point) UnmarshalJSON(bs []byte) error {
+func (p *point) UnmarshalJSON(bs []byte) error {
 	pt := &UnmarshallablePoint{}
 	err := json.Unmarshal(bs, pt)
 	if err != nil {

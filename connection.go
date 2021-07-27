@@ -13,7 +13,7 @@ var (
 	session *sql.DB
 )
 
-func InitDB(pgUser, pgPassword, pgHost string, pgPort int, pgDB, pgSSLMode string) {
+func initDB(pgUser, pgPassword, pgHost string, pgPort int, pgDB, pgSSLMode string) {
 	var passwordString string
 	if pgPassword != "" {
 		passwordString = fmt.Sprintf("password='%s' ", pgPassword)

@@ -1,53 +1,53 @@
 package main
 
-type Point struct {
+type point struct {
 	Value     float64 `json:"value"`
 	Timestamp int64   `json:"timestamp"`
 	Window    int64   `json:"window,omitempty"`
 	Null      bool    `json:"-"`
 }
 
-type InsertPointQuery struct {
+type insertPointQuery struct {
 	Metric string            `json:"metric"`
 	Tags   map[string]string `json:"tags"`
-	Point  *Point            `json:"point"`
+	Point  *point            `json:"point"`
 }
 
-type DeletePointsQuery struct {
+type deletePointsQuery struct {
 	Metric string            `json:"metric"`
 	Start  int64             `json:"start"`
 	End    int64             `json:"end"`
 	Tags   map[string]string `json:"tags"`
 }
 
-type AggregatorQuery struct {
+type aggregatorQuery struct {
 	Name    string                 `json:"name"`
 	Options map[string]interface{} `json:"options"`
 }
 
-type PointsQuery struct {
+type pointsQuery struct {
 	Metric      string                 `json:"metric"`
 	Start       int64                  `json:"start"`
 	End         int64                  `json:"end"`
 	N           int64                  `json:"n"`
 	Tags        map[string]string      `json:"tags"`
 	Window      map[string]interface{} `json:"window"`
-	Aggregators []*AggregatorQuery     `json:"aggregators"`
+	Aggregators []*aggregatorQuery     `json:"aggregators"`
 }
 
-type ServerError struct {
+type serverError struct {
 	Error string `json:"error"`
 }
 
-type MetricExistsResponse struct {
+type metricExistsResponse struct {
 	Exists bool `json:"exists"`
 }
 
-type CreateMetricRequest struct {
+type createMetricRequest struct {
 	Metric string   `json:"metric"`
 	Tags   []string `json:"tags"`
 }
 
-type DeleteMetricRequest struct {
+type deleteMetricRequest struct {
 	Metric string `json:"metric"`
 }

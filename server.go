@@ -16,14 +16,14 @@ var (
 	readLineProtocolBufferSize = 65536
 )
 
-func InitServer(tsdbHost string, tsdbPort int, tsdbReadTimeout, tsdbWriteTimeout time.Duration, readLineProtocolBufferSizeP int) {
+func initServer(tsdbHost string, tsdbPort int, tsdbReadTimeout, tsdbWriteTimeout time.Duration, readLineProtocolBufferSizeP int) {
 	router := httprouter.New()
-	router.GET("/metric_exists", MetricExistsHandler)
-	router.POST("/create_metric", CreateMetricHandler)
-	router.DELETE("/delete_metric", DeleteMetricHandler)
-	router.POST("/insert_points", InsertPointsHandler)
-	router.POST("/query_points", QueryPointsHandler)
-	router.DELETE("/delete_points", DeletePointsHandler)
+	router.GET("/metric_exists", metricExistsHandler)
+	router.POST("/create_metric", createMetricHandler)
+	router.DELETE("/delete_metric", deleteMetricHandler)
+	router.POST("/insert_points", insertPointsHandler)
+	router.POST("/query_points", queryPointsHandler)
+	router.DELETE("/delete_points", deletePointsHandler)
 
 	s := &http.Server{
 		Addr:           fmt.Sprintf("%s:%d", tsdbHost, tsdbPort),
@@ -41,7 +41,7 @@ func InitServer(tsdbHost string, tsdbPort int, tsdbReadTimeout, tsdbWriteTimeout
 func write400Error(w http.ResponseWriter, err string) error {
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusBadRequest)
-	return json.NewEncoder(w).Encode(&ServerError{
+	return json.NewEncoder(w).Encode(&serverError{
 		Error: err,
 	})
 }
@@ -51,7 +51,7 @@ Returns 400 on invalid request
 Returns 200 on successful request
 Returns 500 on server failure
 */
-func MetricExistsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func metricExistsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("metric_exists request from %s", r.RemoteAddr)
 	if err := r.ParseForm(); err != nil {
 		log.Error(err)
@@ -80,7 +80,7 @@ func MetricExistsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 		metric = metricForm[0]
 	}
 
-	if exists, err := MetricExists(metric); err != nil {
+	if exists, err := metricExists(metric); err != nil {
 		log.Error(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
 			log.Error(err0)
@@ -89,7 +89,7 @@ func MetricExistsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 	} else {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(&MetricExistsResponse{
+		if err := json.NewEncoder(w).Encode(&metricExistsResponse{
 			Exists: exists,
 		}); err != nil {
 			log.Error(err)
@@ -103,7 +103,7 @@ Returns 400 on invalid request
 Returns 409 on metrics that already exist
 Returns 200 on successful creation
 */
-func CreateMetricHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func createMetricHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("create_metric request from %s", r.RemoteAddr)
 	typeHeader := r.Header.Values("Content-Type")
 
@@ -125,7 +125,7 @@ func CreateMetricHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 
 	defer r.Body.Close()
 
-	req := &CreateMetricRequest{}
+	req := &createMetricRequest{}
 
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		log.Error(err)
@@ -135,7 +135,7 @@ func CreateMetricHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 		return
 	}
 
-	err := CreateMetric(req.Metric, req.Tags)
+	err := createMetric(req.Metric, req.Tags)
 	if err != nil {
 		if err.Error() == "metric already exists" {
 			log.Error("create_metric: metric already exists")
@@ -157,7 +157,7 @@ Returns 400 on invalid request
 Returns 404 on metrics that don't exist
 Returns 200 on successful deletion
 */
-func DeleteMetricHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func deleteMetricHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("delete_metric request from %s", r.RemoteAddr)
 
 	typeHeader := r.Header.Values("Content-Type")
@@ -180,7 +180,7 @@ func DeleteMetricHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 
 	defer r.Body.Close()
 
-	req := &DeleteMetricRequest{}
+	req := &deleteMetricRequest{}
 
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		log.Error(err)
@@ -190,7 +190,7 @@ func DeleteMetricHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 		return
 	}
 
-	err := DeleteMetric(req.Metric)
+	err := deleteMetric(req.Metric)
 	if err != nil {
 		if err.Error() == "metric does not exist" {
 			log.Error("delete_metric: metric does not exist")
@@ -211,7 +211,7 @@ func DeleteMetricHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 Returns 400 on invalid request
 Returns 200 on successful insertion
 */
-func InsertPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func insertPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("insert_points request from %s", r.RemoteAddr)
 
 	typeHeader := r.Header.Values("Content-Type")
@@ -239,7 +239,7 @@ func InsertPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 	scanner.Buffer(buf, readLineProtocolBufferSize)
 
 	for scanner.Scan() {
-		query, err := ParseLine(scanner.Bytes())
+		query, err := parseLine(scanner.Bytes())
 		if err != nil {
 			log.Error(err)
 			if err0 := write400Error(w, err.Error()); err0 != nil {
@@ -248,7 +248,7 @@ func InsertPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 			return
 		}
 
-		err = InsertPoint(query)
+		err = insertPoint(query)
 		if err != nil {
 			log.Error(err)
 			if err0 := write400Error(w, err.Error()); err0 != nil {
@@ -265,7 +265,7 @@ func InsertPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 Returns 400 on invalid request
 Returns 200 on successful query
 */
-func QueryPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func queryPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("query_points request from %s", r.RemoteAddr)
 
 	typeHeader := r.Header.Values("Content-Type")
@@ -288,7 +288,7 @@ func QueryPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 
 	defer r.Body.Close()
 
-	req := &PointsQuery{}
+	req := &pointsQuery{}
 
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		log.Error(err)
@@ -298,7 +298,7 @@ func QueryPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 		return
 	}
 
-	points, err := QueryPoints(req)
+	points, err := queryPoints(req)
 
 	if err != nil {
 		log.Error(err)
@@ -320,7 +320,7 @@ Returns 400 on invalid request
 Returns 404 on metrics that don't exist
 Returns 200 on successful deletion
 */
-func DeletePointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func deletePointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("delete_points request from %s", r.RemoteAddr)
 
 	typeHeader := r.Header.Values("Content-Type")
@@ -343,7 +343,7 @@ func DeletePointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 
 	defer r.Body.Close()
 
-	req := &DeletePointsQuery{}
+	req := &deletePointsQuery{}
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		log.Error(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
@@ -352,7 +352,7 @@ func DeletePointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 		return
 	}
 
-	if err := DeletePoints(req); err != nil {
+	if err := deletePoints(req); err != nil {
 		log.Error(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
 			log.Error(err0)

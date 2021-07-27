@@ -11,7 +11,7 @@ func main() {
 	log.Info("Starting SimpleTSDB")
 	// load config
 	cfg := map[string]string{}
-	if err := LoadConfig("config", cfg); err != nil {
+	if err := loadConfig("config", cfg); err != nil {
 		log.Fatal(err)
 	}
 	// init db
@@ -40,7 +40,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	InitDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], dbPort, cfg["postgres_db"], cfg["postgres_ssl_mode"])
+	initDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], dbPort, cfg["postgres_db"], cfg["postgres_ssl_mode"])
 
 	log.Infof("Connected to database [%s] at %s:%d", cfg["postgres_db"], cfg["postgres_host"], dbPort)
 	// init server
@@ -78,5 +78,5 @@ func main() {
 	}
 
 	log.Infof("Initializing server at %s:%d", cfg["simpletsdb_bind_host"], serverPort)
-	InitServer(cfg["simpletsdb_bind_host"], serverPort, serverReadTimeout, serverWriteTimeout, readLineProtocolBufferSize)
+	initServer(cfg["simpletsdb_bind_host"], serverPort, serverReadTimeout, serverWriteTimeout, readLineProtocolBufferSize)
 }
