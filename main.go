@@ -1,16 +1,18 @@
 package main
 
 import (
-	"log"
 	"strconv"
 	"time"
 
 	"simpletsdb/datastore"
 	"simpletsdb/server"
 	"simpletsdb/util"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func main() {
+	log.Info("Starting SimpleTSDB")
 	// load config
 	cfg := map[string]string{}
 	if err := util.LoadConfig("config", cfg); err != nil {
@@ -23,14 +25,14 @@ func main() {
 	if v, ok := cfg["postgres_username"]; v == "" || !ok {
 		log.Fatal("postgres_password config is required")
 	}
-	if v, ok := cfg["postgress_ssl_mode"]; v == "" || !ok {
-		log.Fatal("postgress_ssl_mode config is required")
+	if v, ok := cfg["postgres_ssl_mode"]; v == "" || !ok {
+		log.Fatal("postgres_ssl_mode config is required")
 	}
-	if v, ok := cfg["postgress_host"]; v == "" || !ok {
-		log.Fatal("postgress_host config is required")
+	if v, ok := cfg["postgres_host"]; v == "" || !ok {
+		log.Fatal("postgres_host config is required")
 	}
-	if v, ok := cfg["postgress_port"]; v == "" || !ok {
-		log.Fatal("postgress_port config is required")
+	if v, ok := cfg["postgres_port"]; v == "" || !ok {
+		log.Fatal("postgres_port config is required")
 	}
 	if v, ok := cfg["postgres_db"]; v == "" || !ok {
 		log.Fatal("postgres_db config is required")
@@ -40,8 +42,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	datastore.InitDB(cfg["postgres_username"], cfg["postgres_password"], cfg["postgres_password"], dbPort, cfg["postgres_db"], cfg["postgress_ssl_mode"])
+	datastore.InitDB(cfg["postgres_username"], cfg["postgres_password"], cfg["postgres_host"], dbPort, cfg["postgres_db"], cfg["postgres_ssl_mode"])
 
+	log.Infof("Connected to database [%s] at %s:%d", cfg["postgres_db"], cfg["postgres_host"], dbPort)
 	// init server
 	if v, ok := cfg["simpletsdb_bind_host"]; v == "" || !ok {
 		log.Fatal("simpletsdb_bind_host config is required")
@@ -76,5 +79,6 @@ func main() {
 		log.Fatal(err)
 	}
 
+	log.Infof("Initializing server at %s:%d", cfg["simpletsdb_bind_host"], serverPort)
 	server.Init(cfg["simpletsdb_bind_host"], serverPort, serverReadTimeout, serverWriteTimeout, readLineProtocolBufferSize)
 }

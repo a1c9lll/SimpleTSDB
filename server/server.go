@@ -55,6 +55,7 @@ Returns 500 on server failure
 */
 func MetricExists(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	if err := r.ParseForm(); err != nil {
+		log.Println(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
 			log.Println(err0)
 		}
@@ -64,14 +65,14 @@ func MetricExists(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		metric string
 	)
 	if metricForm, ok := r.Form["metric"]; !ok {
-		log.Println("metric is required")
+		log.Println("metric_exists: metric is required")
 		if err := write400Error(w, "metric is required"); err != nil {
 			log.Println(err)
 		}
 		return
 	} else {
 		if len(metricForm) != 1 {
-			log.Println("only one metric allowed")
+			log.Println("metric_exists: only one metric allowed")
 			if err := write400Error(w, "only one metric allowed"); err != nil {
 				log.Println(err)
 			}
@@ -137,6 +138,7 @@ func CreateMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	err := datastore.CreateMetric(req.Metric, req.Tags)
 	if err != nil {
 		if err.Error() == "metric already exists" {
+			log.Println("create_metric: metric already exists")
 			w.WriteHeader(http.StatusConflict)
 		} else {
 			log.Println(err)
@@ -189,6 +191,7 @@ func DeleteMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	err := datastore.DeleteMetric(req.Metric)
 	if err != nil {
 		if err.Error() == "metric does not exist" {
+			log.Println("delete_metric: metric does not exist")
 			w.WriteHeader(http.StatusNotFound)
 		} else {
 			log.Println(err)
