@@ -1,18 +1,19 @@
-package datastore
+package main
 
 import (
-	"simpletsdb/core"
-	"simpletsdb/util"
 	"strconv"
 	"testing"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestMain(t *testing.T) {
+	log.SetLevel(log.FatalLevel)
 	cfg := map[string]string{}
-	if err := util.LoadConfig("../config", cfg); err != nil {
+	if err := LoadConfig("./config", cfg); err != nil {
 		t.Fatal(err)
 	}
 	port, err := strconv.Atoi(cfg["postgres_port"])
@@ -30,6 +31,12 @@ func TestMain(t *testing.T) {
 	DeleteMetric("test2")
 
 	err = CreateMetric("test0", []string{"id", "type"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	DeleteMetric("test7")
+
+	err = CreateMetric("test7", []string{"id", "type"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +63,7 @@ func TestInvalidTags(t *testing.T) {
 }
 
 func TestInvalidMetricNameInInsertPoint(t *testing.T) {
-	if err := InsertPoint(&core.InsertPointQuery{
+	if err := InsertPoint(&InsertPointQuery{
 		Metric: " a b",
 	}); err == nil {
 		t.Fatal("expected error")
@@ -66,7 +73,7 @@ func TestInvalidMetricNameInInsertPoint(t *testing.T) {
 }
 
 func TestInvalidMetricNameInQuery(t *testing.T) {
-	if _, err := QueryPoints(&core.PointsQuery{
+	if _, err := QueryPoints(&PointsQuery{
 		Metric: " a b",
 	}); err == nil {
 		t.Fatal("expected error")
@@ -76,13 +83,13 @@ func TestInvalidMetricNameInQuery(t *testing.T) {
 }
 
 func TestMetricRequired(t *testing.T) {
-	if _, err := QueryPoints(&core.PointsQuery{}); err == nil {
+	if _, err := QueryPoints(&PointsQuery{}); err == nil {
 		t.Fatal("expected error")
 	} else if err != errMetricRequired {
 		t.Fatalf("wrong error: %s", err)
 	}
 
-	if err := InsertPoint(&core.InsertPointQuery{}); err == nil {
+	if err := InsertPoint(&InsertPointQuery{}); err == nil {
 		t.Fatal("expected error")
 	} else if err != errMetricRequired {
 		t.Fatalf("wrong error: %s", err)
@@ -100,14 +107,14 @@ func TestMetricExists(t *testing.T) {
 }
 
 func TestInsertPointAndQuery(t *testing.T) {
-	for _, pt := range []*core.InsertPointQuery{
+	for _, pt := range []*InsertPointQuery{
 		{
 			Metric: "test0",
 			Tags: map[string]string{
 				"id":   "25862",
 				"type": "high",
 			},
-			Point: &core.Point{
+			Point: &Point{
 				Value:     183001000,
 				Timestamp: time.Now().UnixNano(),
 			},
@@ -118,7 +125,7 @@ func TestInsertPointAndQuery(t *testing.T) {
 				"id":   "25862",
 				"type": "low",
 			},
-			Point: &core.Point{
+			Point: &Point{
 				Value:     182599002,
 				Timestamp: time.Now().UnixNano(),
 			},
@@ -129,7 +136,7 @@ func TestInsertPointAndQuery(t *testing.T) {
 				"id":   "25862",
 				"type": "high",
 			},
-			Point: &core.Point{
+			Point: &Point{
 				Value:     183001199,
 				Timestamp: time.Now().UnixNano(),
 			},
@@ -140,7 +147,7 @@ func TestInsertPointAndQuery(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	points, err := QueryPoints(&core.PointsQuery{
+	points, err := QueryPoints(&PointsQuery{
 		Metric: "test0",
 		Tags: map[string]string{
 			"id":   "25862",
@@ -158,12 +165,12 @@ func TestInsertPointAndQuery(t *testing.T) {
 	}
 
 	// insert null point
-	err = InsertPoint(&core.InsertPointQuery{
+	err = InsertPoint(&InsertPointQuery{
 		Metric: "test0",
 		Tags: map[string]string{
 			"id": "24987",
 		},
-		Point: &core.Point{
+		Point: &Point{
 			Timestamp: time.Now().UnixNano(),
 			Null:      true,
 		},
@@ -172,7 +179,7 @@ func TestInsertPointAndQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	points, err = QueryPoints(&core.PointsQuery{
+	points, err = QueryPoints(&PointsQuery{
 		Metric: "test0",
 		Tags: map[string]string{
 			"id": "24987",
@@ -205,12 +212,12 @@ func TestDeletePoints(t *testing.T) {
 
 	baseTime := time.Now().Add(-time.Minute * 50)
 	for i := 0; i < 10; i++ {
-		err := InsertPoint(&core.InsertPointQuery{
+		err := InsertPoint(&InsertPointQuery{
 			Metric: "test9",
 			Tags: map[string]string{
 				"id": "1",
 			},
-			Point: &core.Point{
+			Point: &Point{
 				Value:     float64(i),
 				Timestamp: baseTime.Add(time.Minute * 5 * time.Duration(i)).UnixNano(),
 			},
@@ -220,7 +227,7 @@ func TestDeletePoints(t *testing.T) {
 		}
 	}
 
-	err = DeletePoints(&core.DeletePointsQuery{
+	err = DeletePoints(&DeletePointsQuery{
 		Metric: "test9",
 		Start:  baseTime.Add(time.Minute * 20).UnixNano(),
 		End:    baseTime.Add(time.Minute * 30).UnixNano(),
@@ -232,7 +239,7 @@ func TestDeletePoints(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	points, err := QueryPoints(&core.PointsQuery{
+	points, err := QueryPoints(&PointsQuery{
 		Metric: "test9",
 		Start:  baseTime.UnixNano(),
 		End:    baseTime.Add(time.Minute * 50).UnixNano(),
@@ -241,7 +248,7 @@ func TestDeletePoints(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	require.Equal(t, []*core.Point{
+	require.Equal(t, []*Point{
 		{Value: 0, Timestamp: baseTime.UnixNano()},
 		{Value: 1, Timestamp: baseTime.Add(time.Minute * 5).UnixNano()},
 		{Value: 2, Timestamp: baseTime.Add(time.Minute * 10).UnixNano()},
@@ -258,25 +265,25 @@ func TestDuplicateInsert(t *testing.T) {
 		t.Fatal(err)
 	}
 	timestamp := time.Now().UnixNano()
-	if err := InsertPoint(&core.InsertPointQuery{
+	if err := InsertPoint(&InsertPointQuery{
 		Metric: "test2",
-		Point: &core.Point{
+		Point: &Point{
 			Value:     182599002,
 			Timestamp: timestamp,
 		},
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := InsertPoint(&core.InsertPointQuery{
+	if err := InsertPoint(&InsertPointQuery{
 		Metric: "test2",
-		Point: &core.Point{
+		Point: &Point{
 			Value:     182599002,
 			Timestamp: timestamp,
 		},
 	}); err != nil {
 		t.Fatal(err)
 	}
-	pts, err := QueryPoints(&core.PointsQuery{
+	pts, err := QueryPoints(&PointsQuery{
 		Metric: "test2",
 		Start:  time.Now().Add(-time.Hour).UnixNano(),
 	})
@@ -298,12 +305,12 @@ func TestWindowAggregator(t *testing.T) {
 
 	baseTime := time.Now().Add(-time.Minute * 15)
 	for i := 0; i < 3; i++ {
-		err := InsertPoint(&core.InsertPointQuery{
+		err := InsertPoint(&InsertPointQuery{
 			Metric: "test1",
 			Tags: map[string]string{
 				"id": "1",
 			},
-			Point: &core.Point{
+			Point: &Point{
 				Value:     float64(i),
 				Timestamp: baseTime.Add(time.Minute * 5 * time.Duration(i)).UnixNano(),
 			},
@@ -313,7 +320,7 @@ func TestWindowAggregator(t *testing.T) {
 		}
 	}
 
-	points, err := QueryPoints(&core.PointsQuery{
+	points, err := QueryPoints(&PointsQuery{
 		Metric: "test1",
 		Tags: map[string]string{
 			"id": "1",
@@ -331,7 +338,7 @@ func TestWindowAggregator(t *testing.T) {
 	startTime := baseTime.UnixNano()
 	windowDur := time.Duration(time.Minute * 5).Nanoseconds()
 	baseAlignedTime := startTime - startTime%windowDur
-	require.Equal(t, []*core.Point{
+	require.Equal(t, []*Point{
 		{Value: 0, Timestamp: baseTime.UnixNano(), Window: baseAlignedTime},
 		{Value: 1, Timestamp: baseTime.Add(time.Minute * 5).UnixNano(), Window: baseAlignedTime + windowDur},
 		{Value: 2, Timestamp: baseTime.Add(time.Minute * 10).UnixNano(), Window: baseAlignedTime + windowDur*2},

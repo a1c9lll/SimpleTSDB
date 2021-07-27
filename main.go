@@ -4,10 +4,6 @@ import (
 	"strconv"
 	"time"
 
-	"simpletsdb/datastore"
-	"simpletsdb/server"
-	"simpletsdb/util"
-
 	log "github.com/sirupsen/logrus"
 )
 
@@ -15,7 +11,7 @@ func main() {
 	log.Info("Starting SimpleTSDB")
 	// load config
 	cfg := map[string]string{}
-	if err := util.LoadConfig("config", cfg); err != nil {
+	if err := LoadConfig("config", cfg); err != nil {
 		log.Fatal(err)
 	}
 	// init db
@@ -44,7 +40,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	datastore.InitDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], dbPort, cfg["postgres_db"], cfg["postgres_ssl_mode"])
+	InitDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], dbPort, cfg["postgres_db"], cfg["postgres_ssl_mode"])
 
 	log.Infof("Connected to database [%s] at %s:%d", cfg["postgres_db"], cfg["postgres_host"], dbPort)
 	// init server
@@ -82,5 +78,5 @@ func main() {
 	}
 
 	log.Infof("Initializing server at %s:%d", cfg["simpletsdb_bind_host"], serverPort)
-	server.Init(cfg["simpletsdb_bind_host"], serverPort, serverReadTimeout, serverWriteTimeout, readLineProtocolBufferSize)
+	InitServer(cfg["simpletsdb_bind_host"], serverPort, serverReadTimeout, serverWriteTimeout, readLineProtocolBufferSize)
 }

@@ -1,8 +1,6 @@
-package aggregators
+package main
 
 import (
-	"simpletsdb/core"
-	"simpletsdb/util"
 	"testing"
 	"time"
 
@@ -10,8 +8,8 @@ import (
 )
 
 func TestWindow(t *testing.T) {
-	baseTime := util.MustParseTime("2000-01-01T00:00:00Z")
-	pts := []*core.Point{
+	baseTime := MustParseTime("2000-01-01T00:00:00Z")
+	pts := []*Point{
 		{Value: 1, Timestamp: baseTime.UnixNano()},
 		{Value: 2, Timestamp: baseTime.Add(time.Minute).UnixNano()},
 		{Value: 3, Timestamp: baseTime.Add(time.Minute * 3).UnixNano()},
@@ -32,7 +30,7 @@ func TestWindow(t *testing.T) {
 	baseTimeNano := baseTime.UnixNano()
 	alignedStartTime := baseTimeNano - baseTimeNano%windowDur
 
-	require.Equal(t, []*core.Point{
+	require.Equal(t, []*Point{
 		{Value: 0, Null: true, Timestamp: baseTime.Add(-time.Minute).UnixNano(), Window: alignedStartTime - windowDur},
 		{Value: 1, Timestamp: baseTime.UnixNano(), Window: alignedStartTime},
 		{Value: 2, Timestamp: baseTime.Add(time.Minute).UnixNano(), Window: alignedStartTime + windowDur},
@@ -48,8 +46,8 @@ func TestWindow(t *testing.T) {
 }
 
 func TestMean(t *testing.T) {
-	baseTime := util.MustParseTime("2000-01-01T00:00:00Z")
-	pts := []*core.Point{
+	baseTime := MustParseTime("2000-01-01T00:00:00Z")
+	pts := []*Point{
 		{Value: 11, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 25, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 30, Timestamp: baseTime.Add(-time.Minute*3).UnixNano() + 1},
@@ -87,8 +85,8 @@ func TestMean(t *testing.T) {
 }
 
 func TestMean2(t *testing.T) {
-	baseTime := util.MustParseTime("2000-01-01T00:00:00Z").Add(-1 * time.Minute)
-	pts := []*core.Point{
+	baseTime := MustParseTime("2000-01-01T00:00:00Z").Add(-1 * time.Minute)
+	pts := []*Point{
 		{Value: 42, Timestamp: baseTime.Add(30 * time.Second).UnixNano()},
 	}
 
@@ -113,8 +111,8 @@ func TestMean2(t *testing.T) {
 }
 
 func TestMean3(t *testing.T) {
-	baseTime := util.MustParseTime("2000-01-01T00:00:00Z").Add(-time.Minute)
-	pts := []*core.Point{}
+	baseTime := MustParseTime("2000-01-01T00:00:00Z").Add(-time.Minute)
+	pts := []*Point{}
 
 	pts, err := Window(baseTime.UnixNano(), baseTime.UnixNano(), map[string]interface{}{
 		"every":       "1m",
@@ -141,8 +139,8 @@ func TestMean3(t *testing.T) {
 }
 
 func TestSum(t *testing.T) {
-	baseTime := util.MustParseTime("2000-01-01T00:00:00Z")
-	pts := []*core.Point{
+	baseTime := MustParseTime("2000-01-01T00:00:00Z")
+	pts := []*Point{
 		{Value: 11, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 25, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 30, Timestamp: baseTime.Add(-time.Minute*3).UnixNano() + 1},
@@ -180,8 +178,8 @@ func TestSum(t *testing.T) {
 }
 
 func TestMin(t *testing.T) {
-	baseTime := util.MustParseTime("2000-01-01T00:00:00Z")
-	pts := []*core.Point{
+	baseTime := MustParseTime("2000-01-01T00:00:00Z")
+	pts := []*Point{
 		{Value: 11, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 25, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 30, Timestamp: baseTime.Add(-time.Minute*3).UnixNano() + 1},
@@ -219,8 +217,8 @@ func TestMin(t *testing.T) {
 }
 
 func TestMax(t *testing.T) {
-	baseTime := util.MustParseTime("2000-01-01T00:00:00Z")
-	pts := []*core.Point{
+	baseTime := MustParseTime("2000-01-01T00:00:00Z")
+	pts := []*Point{
 		{Value: 11, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 25, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 30, Timestamp: baseTime.Add(-time.Minute*3).UnixNano() + 1},
@@ -258,8 +256,8 @@ func TestMax(t *testing.T) {
 }
 
 func TestMax2(t *testing.T) {
-	baseTime := util.MustParseTime("2000-01-01T00:00:00Z")
-	pts := []*core.Point{
+	baseTime := MustParseTime("2000-01-01T00:00:00Z")
+	pts := []*Point{
 		{Value: 11, Timestamp: baseTime.Add(-time.Minute * 1).UnixNano()},
 	}
 
@@ -287,8 +285,8 @@ func TestMax2(t *testing.T) {
 }
 
 func TestMax3(t *testing.T) {
-	baseTime := util.MustParseTime("2000-01-01T00:00:00Z")
-	pts := []*core.Point{
+	baseTime := MustParseTime("2000-01-01T00:00:00Z")
+	pts := []*Point{
 		{Value: 11, Timestamp: baseTime.Add(-time.Minute * 4).UnixNano()},
 		{Value: 12, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 13, Timestamp: baseTime.Add(-time.Minute).UnixNano()},
@@ -321,8 +319,8 @@ func TestMax3(t *testing.T) {
 
 func TestCount(t *testing.T) {
 	// test without counting null points
-	baseTime := util.MustParseTime("2000-01-01T00:00:00Z")
-	pts := []*core.Point{
+	baseTime := MustParseTime("2000-01-01T00:00:00Z")
+	pts := []*Point{
 		{Value: 11, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 25, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 30, Timestamp: baseTime.Add(-time.Minute*3).UnixNano() + 1},
@@ -362,7 +360,7 @@ func TestCount(t *testing.T) {
 	}, vals)
 
 	// test with counting null points
-	pts = []*core.Point{
+	pts = []*Point{
 		{Value: 11, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 25, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 30, Timestamp: baseTime.Add(-time.Minute*3).UnixNano() + 1},
@@ -405,8 +403,8 @@ func TestCount(t *testing.T) {
 }
 
 func TestFirst(t *testing.T) {
-	baseTime := util.MustParseTime("2000-01-01T00:00:00Z")
-	pts := []*core.Point{
+	baseTime := MustParseTime("2000-01-01T00:00:00Z")
+	pts := []*Point{
 		{Value: 11, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 25, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 30, Timestamp: baseTime.Add(-time.Minute*3).UnixNano() + 1},
@@ -444,8 +442,8 @@ func TestFirst(t *testing.T) {
 }
 
 func TestLast(t *testing.T) {
-	baseTime := util.MustParseTime("2000-01-01T00:00:00Z")
-	pts := []*core.Point{
+	baseTime := MustParseTime("2000-01-01T00:00:00Z")
+	pts := []*Point{
 		{Value: 11, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 25, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 30, Timestamp: baseTime.Add(-time.Minute*3).UnixNano() + 1},
@@ -482,8 +480,8 @@ func TestLast(t *testing.T) {
 }
 
 func TestBucketize(t *testing.T) {
-	baseTime := util.MustParseTime("2000-01-01T00:00:00Z")
-	pts := []*core.Point{
+	baseTime := MustParseTime("2000-01-01T00:00:00Z")
+	pts := []*Point{
 		{Value: 11, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 25, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 30, Timestamp: baseTime.Add(-time.Minute*3).UnixNano() + 1},
@@ -521,7 +519,7 @@ func TestBucketize(t *testing.T) {
 	}, vals)
 
 	// test bucketize with one point
-	pts = []*core.Point{
+	pts = []*Point{
 		{Value: 11, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 	}
 
@@ -549,8 +547,8 @@ func TestBucketize(t *testing.T) {
 }
 
 func TestMedian(t *testing.T) {
-	baseTime := util.MustParseTime("2000-01-01T00:00:00Z")
-	pts := []*core.Point{
+	baseTime := MustParseTime("2000-01-01T00:00:00Z")
+	pts := []*Point{
 		{Value: 11, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 25, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 30, Timestamp: baseTime.Add(-time.Minute*3).UnixNano() + 1},
@@ -584,8 +582,8 @@ func TestMedian(t *testing.T) {
 }
 
 func TestMode(t *testing.T) {
-	baseTime := util.MustParseTime("2000-01-01T00:00:00Z")
-	pts := []*core.Point{
+	baseTime := MustParseTime("2000-01-01T00:00:00Z")
+	pts := []*Point{
 		{Value: 11, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 11, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 30, Timestamp: baseTime.Add(-time.Minute*3).UnixNano() + 1},
@@ -628,8 +626,8 @@ func TestMode(t *testing.T) {
 
 func TestStdDev(t *testing.T) {
 	// population mode
-	baseTime := util.MustParseTime("2000-01-01T00:00:00Z")
-	pts := []*core.Point{
+	baseTime := MustParseTime("2000-01-01T00:00:00Z")
+	pts := []*Point{
 		{Value: 11, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 25, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 30, Timestamp: baseTime.Add(-time.Minute*3).UnixNano() + 1},
@@ -667,7 +665,7 @@ func TestStdDev(t *testing.T) {
 	}, vals)
 
 	// sample mode
-	pts = []*core.Point{
+	pts = []*Point{
 		{Value: 11, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 25, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 		{Value: 30, Timestamp: baseTime.Add(-time.Minute*3).UnixNano() + 1},
@@ -705,7 +703,7 @@ func TestStdDev(t *testing.T) {
 	}, vals)
 
 	// sample mode with 1 point
-	pts = []*core.Point{
+	pts = []*Point{
 		{Value: 11, Timestamp: baseTime.Add(-time.Minute * 3).UnixNano()},
 	}
 
@@ -733,9 +731,9 @@ func TestStdDev(t *testing.T) {
 }
 
 func TestFill(t *testing.T) {
-	pts := []*core.Point{}
+	pts := []*Point{}
 
-	baseTime := util.MustParseTime("2000-01-01T00:00:00Z")
+	baseTime := MustParseTime("2000-01-01T00:00:00Z")
 	pts, err := Window(baseTime.Add(-time.Second*30).UnixNano(), baseTime.UnixNano(), map[string]interface{}{
 		"every":       "5s",
 		"createEmpty": true,
@@ -770,7 +768,7 @@ func TestFill(t *testing.T) {
 	}, vals)
 
 	// with usePrevious
-	pts = []*core.Point{
+	pts = []*Point{
 		{Value: 42, Timestamp: baseTime.Add(-time.Second * 30).UnixNano()},
 	}
 

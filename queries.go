@@ -1,4 +1,4 @@
-package datastore
+package main
 
 import (
 	"context"
@@ -9,9 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"simpletsdb/aggregators"
-	"simpletsdb/core"
 )
 
 var (
@@ -109,7 +106,7 @@ func DeleteMetric(name string) error {
 	return nil
 }
 
-func generatePointInsertionStringsAndValues(query *core.InsertPointQuery) (string, string, []interface{}, error) {
+func generatePointInsertionStringsAndValues(query *InsertPointQuery) (string, string, []interface{}, error) {
 	tagsStrBuilder, valuesStrBuilder := &strings.Builder{}, &strings.Builder{}
 	values := []interface{}{query.Point.Timestamp}
 
@@ -136,7 +133,7 @@ func generatePointInsertionStringsAndValues(query *core.InsertPointQuery) (strin
 	return tagsStrBuilder.String(), valuesStrBuilder.String(), values, nil
 }
 
-func InsertPoint(query *core.InsertPointQuery) error {
+func InsertPoint(query *InsertPointQuery) error {
 	if query.Metric == "" {
 		return errMetricRequired
 	}
@@ -159,7 +156,7 @@ func InsertPoint(query *core.InsertPointQuery) error {
 // TODO: Batch the inserts if possible. Although it may be
 //       difficult to keep the insert order with multiple different
 //       metrics being inserted.
-func InsertPoints(queries []*core.InsertPointQuery) error {
+func InsertPoints(queries []*InsertPointQuery) error {
 	ctx := context.Background()
 	tx, err := session.BeginTx(ctx, nil)
 	if err != nil {
@@ -213,7 +210,7 @@ func generateTagsQueryString(tags map[string]string, queryVals []interface{}, ar
 	return s.String(), queryVals, argsCounter - 1, nil
 }
 
-func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
+func QueryPoints(query *PointsQuery) ([]*Point, error) {
 	if query.Metric == "" {
 		return nil, errMetricRequired
 	}
@@ -255,7 +252,7 @@ func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
 	var (
 		value     interface{}
 		timestamp int64
-		points    []*core.Point
+		points    []*Point
 	)
 	if err != nil {
 		scanner.Close()
@@ -268,13 +265,13 @@ func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
 			return nil, err
 		}
 		if value == nil {
-			points = append(points, &core.Point{
+			points = append(points, &Point{
 				Value:     0,
 				Timestamp: timestamp,
 				Null:      true,
 			})
 		} else {
-			points = append(points, &core.Point{
+			points = append(points, &Point{
 				Value:     value.(float64),
 				Timestamp: timestamp,
 			})
@@ -292,7 +289,7 @@ func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
 	)
 
 	if query.Window != nil {
-		points, err = aggregators.Window(query.Start, query.End, query.Window, points)
+		points, err = Window(query.Start, query.End, query.Window, points)
 		if err != nil {
 			return nil, err
 		}
@@ -320,7 +317,7 @@ func QueryPoints(query *core.PointsQuery) ([]*core.Point, error) {
 	return points, nil
 }
 
-func DeletePoints(query *core.DeletePointsQuery) error {
+func DeletePoints(query *DeletePointsQuery) error {
 	if query.Metric == "" {
 		return errMetricRequired
 	}

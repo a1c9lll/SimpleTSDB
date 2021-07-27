@@ -1,4 +1,4 @@
-package core
+package main
 
 type Point struct {
 	Value     float64 `json:"value"`
@@ -33,4 +33,21 @@ type PointsQuery struct {
 	Tags        map[string]string      `json:"tags"`
 	Window      map[string]interface{} `json:"window"`
 	Aggregators []*AggregatorQuery     `json:"aggregators"`
+}
+
+type ServerError struct {
+	Error string `json:"error"`
+}
+
+type MetricExistsResponse struct {
+	Exists bool `json:"exists"`
+}
+
+type CreateMetricRequest struct {
+	Metric string   `json:"metric"`
+	Tags   []string `json:"tags"`
+}
+
+type DeleteMetricRequest struct {
+	Metric string `json:"metric"`
 }

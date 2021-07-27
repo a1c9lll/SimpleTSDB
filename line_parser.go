@@ -1,9 +1,8 @@
-package util
+package main
 
 import (
 	"errors"
 	"regexp"
-	"simpletsdb/core"
 	"strconv"
 	"strings"
 )
@@ -14,7 +13,7 @@ var (
 	errInvalidSyntax = errors.New("parse line: invalid line protocol syntax")
 )
 
-func ParseLine(line []byte) (*core.InsertPointQuery, error) {
+func ParseLine(line []byte) (*InsertPointQuery, error) {
 	strs := lineMatchRe.FindAllSubmatch(line, -1)
 	if len(strs) != 1 {
 		return nil, errNoMatches
@@ -61,10 +60,10 @@ func ParseLine(line []byte) (*core.InsertPointQuery, error) {
 		return nil, err
 	}
 
-	return &core.InsertPointQuery{
+	return &InsertPointQuery{
 		Metric: metric,
 		Tags:   tags,
-		Point: &core.Point{
+		Point: &Point{
 			Value:     value,
 			Timestamp: timestamp,
 			Null:      isNull,

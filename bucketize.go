@@ -1,15 +1,13 @@
-package aggregators
+package main
 
-import "simpletsdb/core"
-
-func Bucketize(points []*core.Point) [][]*core.Point {
+func Bucketize(points []*Point) [][]*Point {
 	if len(points) == 0 {
-		return [][]*core.Point{}
+		return [][]*Point{}
 	}
 
 	var (
 		lastWindow int64
-		buckets    [][]*core.Point
+		buckets    [][]*Point
 		idxStart   int
 		idxEnd     int
 	)

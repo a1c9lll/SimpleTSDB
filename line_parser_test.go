@@ -1,7 +1,6 @@
-package util
+package main
 
 import (
-	"simpletsdb/core"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,13 +13,13 @@ func TestLineParser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	require.Equal(t, &core.InsertPointQuery{
+	require.Equal(t, &InsertPointQuery{
 		Metric: "test0",
 		Tags: map[string]string{
 			"id":   "28084",
 			"type": "high",
 		},
-		Point: &core.Point{
+		Point: &Point{
 			Value:     18765003.4,
 			Timestamp: 138456387,
 		},
@@ -32,10 +31,10 @@ func TestLineParser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	require.Equal(t, &core.InsertPointQuery{
+	require.Equal(t, &InsertPointQuery{
 		Metric: "test0",
 		Tags:   map[string]string{},
-		Point: &core.Point{
+		Point: &Point{
 			Value:     187650,
 			Timestamp: 138456387,
 		},
@@ -47,10 +46,10 @@ func TestLineParser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	require.Equal(t, &core.InsertPointQuery{
+	require.Equal(t, &InsertPointQuery{
 		Metric: "test0",
 		Tags:   map[string]string{},
-		Point: &core.Point{
+		Point: &Point{
 			Value:     0,
 			Timestamp: 138456387,
 			Null:      true,
@@ -75,10 +74,10 @@ func TestLineParser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	require.Equal(t, &core.InsertPointQuery{
+	require.Equal(t, &InsertPointQuery{
 		Metric: "test0",
 		Tags:   map[string]string{},
-		Point: &core.Point{
+		Point: &Point{
 			Value:     -3749827,
 			Timestamp: 138456387,
 		},

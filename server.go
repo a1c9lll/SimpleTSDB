@@ -1,13 +1,10 @@
-package server
+package main
 
 import (
 	"bufio"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"simpletsdb/core"
-	"simpletsdb/datastore"
-	"simpletsdb/util"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -19,14 +16,14 @@ var (
 	readLineProtocolBufferSize = 65536
 )
 
-func Init(tsdbHost string, tsdbPort int, tsdbReadTimeout, tsdbWriteTimeout time.Duration, readLineProtocolBufferSizeP int) {
+func InitServer(tsdbHost string, tsdbPort int, tsdbReadTimeout, tsdbWriteTimeout time.Duration, readLineProtocolBufferSizeP int) {
 	router := httprouter.New()
-	router.GET("/metric_exists", MetricExists)
-	router.POST("/create_metric", CreateMetric)
-	router.DELETE("/delete_metric", DeleteMetric)
-	router.POST("/insert_points", InsertPoints)
-	router.POST("/query_points", QueryPoints)
-	router.DELETE("/delete_points", DeletePoints)
+	router.GET("/metric_exists", MetricExistsHandler)
+	router.POST("/create_metric", CreateMetricHandler)
+	router.DELETE("/delete_metric", DeleteMetricHandler)
+	router.POST("/insert_points", InsertPointsHandler)
+	router.POST("/query_points", QueryPointsHandler)
+	router.DELETE("/delete_points", DeletePointsHandler)
 
 	s := &http.Server{
 		Addr:           fmt.Sprintf("%s:%d", tsdbHost, tsdbPort),
@@ -54,7 +51,7 @@ Returns 400 on invalid request
 Returns 200 on successful request
 Returns 500 on server failure
 */
-func MetricExists(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func MetricExistsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("metric_exists request from %s", r.RemoteAddr)
 	if err := r.ParseForm(); err != nil {
 		log.Error(err)
@@ -83,7 +80,7 @@ func MetricExists(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		metric = metricForm[0]
 	}
 
-	if exists, err := datastore.MetricExists(metric); err != nil {
+	if exists, err := MetricExists(metric); err != nil {
 		log.Error(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
 			log.Error(err0)
@@ -106,7 +103,7 @@ Returns 400 on invalid request
 Returns 409 on metrics that already exist
 Returns 200 on successful creation
 */
-func CreateMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func CreateMetricHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("create_metric request from %s", r.RemoteAddr)
 	typeHeader := r.Header.Values("Content-Type")
 
@@ -138,7 +135,7 @@ func CreateMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		return
 	}
 
-	err := datastore.CreateMetric(req.Metric, req.Tags)
+	err := CreateMetric(req.Metric, req.Tags)
 	if err != nil {
 		if err.Error() == "metric already exists" {
 			log.Error("create_metric: metric already exists")
@@ -160,7 +157,7 @@ Returns 400 on invalid request
 Returns 404 on metrics that don't exist
 Returns 200 on successful deletion
 */
-func DeleteMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func DeleteMetricHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("delete_metric request from %s", r.RemoteAddr)
 
 	typeHeader := r.Header.Values("Content-Type")
@@ -193,7 +190,7 @@ func DeleteMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		return
 	}
 
-	err := datastore.DeleteMetric(req.Metric)
+	err := DeleteMetric(req.Metric)
 	if err != nil {
 		if err.Error() == "metric does not exist" {
 			log.Error("delete_metric: metric does not exist")
@@ -214,7 +211,7 @@ func DeleteMetric(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 Returns 400 on invalid request
 Returns 200 on successful insertion
 */
-func InsertPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func InsertPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("insert_points request from %s", r.RemoteAddr)
 
 	typeHeader := r.Header.Values("Content-Type")
@@ -242,7 +239,7 @@ func InsertPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	scanner.Buffer(buf, readLineProtocolBufferSize)
 
 	for scanner.Scan() {
-		query, err := util.ParseLine(scanner.Bytes())
+		query, err := ParseLine(scanner.Bytes())
 		if err != nil {
 			log.Error(err)
 			if err0 := write400Error(w, err.Error()); err0 != nil {
@@ -251,7 +248,7 @@ func InsertPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 			return
 		}
 
-		err = datastore.InsertPoint(query)
+		err = InsertPoint(query)
 		if err != nil {
 			log.Error(err)
 			if err0 := write400Error(w, err.Error()); err0 != nil {
@@ -268,7 +265,7 @@ func InsertPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 Returns 400 on invalid request
 Returns 200 on successful query
 */
-func QueryPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func QueryPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("query_points request from %s", r.RemoteAddr)
 
 	typeHeader := r.Header.Values("Content-Type")
@@ -291,7 +288,7 @@ func QueryPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
 	defer r.Body.Close()
 
-	req := &core.PointsQuery{}
+	req := &PointsQuery{}
 
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		log.Error(err)
@@ -301,7 +298,7 @@ func QueryPoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		return
 	}
 
-	points, err := datastore.QueryPoints(req)
+	points, err := QueryPoints(req)
 
 	if err != nil {
 		log.Error(err)
@@ -323,7 +320,7 @@ Returns 400 on invalid request
 Returns 404 on metrics that don't exist
 Returns 200 on successful deletion
 */
-func DeletePoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func DeletePointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("delete_points request from %s", r.RemoteAddr)
 
 	typeHeader := r.Header.Values("Content-Type")
@@ -346,7 +343,7 @@ func DeletePoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
 	defer r.Body.Close()
 
-	req := &core.DeletePointsQuery{}
+	req := &DeletePointsQuery{}
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		log.Error(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
@@ -355,7 +352,7 @@ func DeletePoints(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		return
 	}
 
-	if err := datastore.DeletePoints(req); err != nil {
+	if err := DeletePoints(req); err != nil {
 		log.Error(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
 			log.Error(err0)

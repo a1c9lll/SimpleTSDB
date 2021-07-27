@@ -1,9 +1,7 @@
-package datastore
+package main
 
 import (
 	"errors"
-	"simpletsdb/aggregators"
-	"simpletsdb/core"
 )
 
 var (
@@ -19,7 +17,7 @@ var (
 	errWindowRequiredForStdDev = errors.New("window must be set for stddev aggregator")
 )
 
-func aggregate(aggregator *core.AggregatorQuery, windowApplied bool, points []*core.Point) ([]*core.Point, bool, error) {
+func aggregate(aggregator *AggregatorQuery, windowApplied bool, points []*Point) ([]*Point, bool, error) {
 	var (
 		windowedAggregatorApplied bool
 		err                       error
@@ -29,31 +27,31 @@ func aggregate(aggregator *core.AggregatorQuery, windowApplied bool, points []*c
 		if !windowApplied {
 			return nil, false, errWindowRequiredForMean
 		}
-		points = aggregators.Mean(points)
+		points = Mean(points)
 		windowedAggregatorApplied = true
 	case "sum":
 		if !windowApplied {
 			return nil, false, errWindowRequiredForSum
 		}
-		points = aggregators.Sum(points)
+		points = Sum(points)
 		windowedAggregatorApplied = true
 	case "min":
 		if !windowApplied {
 			return nil, false, errWindowRequiredForMin
 		}
-		points = aggregators.Min(points)
+		points = Min(points)
 		windowedAggregatorApplied = true
 	case "max":
 		if !windowApplied {
 			return nil, false, errWindowRequiredForMax
 		}
-		points = aggregators.Max(points)
+		points = Max(points)
 		windowedAggregatorApplied = true
 	case "count":
 		if !windowApplied {
 			return nil, false, errWindowRequiredForCount
 		}
-		points, err = aggregators.Count(aggregator.Options, points)
+		points, err = Count(aggregator.Options, points)
 		if err != nil {
 			return nil, false, err
 		}
@@ -62,31 +60,31 @@ func aggregate(aggregator *core.AggregatorQuery, windowApplied bool, points []*c
 		if !windowApplied {
 			return nil, false, errWindowRequiredForFirst
 		}
-		points = aggregators.First(points)
+		points = First(points)
 		windowedAggregatorApplied = true
 	case "last":
 		if !windowApplied {
 			return nil, false, errWindowRequiredForLast
 		}
-		points = aggregators.Last(points)
+		points = Last(points)
 		windowedAggregatorApplied = true
 	case "median":
 		if !windowApplied {
 			return nil, false, errWindowRequiredForMedian
 		}
-		points = aggregators.Median(points)
+		points = Median(points)
 		windowedAggregatorApplied = true
 	case "mode":
 		if !windowApplied {
 			return nil, false, errWindowRequiredForMode
 		}
-		points = aggregators.Mode(points)
+		points = Mode(points)
 		windowedAggregatorApplied = true
 	case "stddev":
 		if !windowApplied {
 			return nil, false, errWindowRequiredForStdDev
 		}
-		points, err = aggregators.StdDev(aggregator.Options, points)
+		points, err = StdDev(aggregator.Options, points)
 		if err != nil {
 			return nil, false, err
 		}
