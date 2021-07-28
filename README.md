@@ -23,4 +23,5 @@ INFO[0000] Initializing server at 127.0.0.1:8981
 ## APIs
 
 Nodejs API found [here](https://github.com/a1c9lll/node-simpletsdb).
-Go API found [here](https://github.com/a1c9lll/go-simpletsdb)
+
+Go API found [here](https://github.com/a1c9lll/go-simpletsdb).
