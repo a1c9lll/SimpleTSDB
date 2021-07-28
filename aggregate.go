@@ -23,12 +23,6 @@ func aggregate(aggregator *aggregatorQuery, windowApplied bool, points []*point)
 		err                       error
 	)
 	switch aggregator.Name {
-	case "mean":
-		if !windowApplied {
-			return nil, false, errWindowRequiredForMean
-		}
-		points = mean(points)
-		windowedAggregatorApplied = true
 	case "sum":
 		if !windowApplied {
 			return nil, false, errWindowRequiredForSum
@@ -67,6 +61,12 @@ func aggregate(aggregator *aggregatorQuery, windowApplied bool, points []*point)
 			return nil, false, errWindowRequiredForLast
 		}
 		points = last(points)
+		windowedAggregatorApplied = true
+	case "mean":
+		if !windowApplied {
+			return nil, false, errWindowRequiredForMean
+		}
+		points = mean(points)
 		windowedAggregatorApplied = true
 	case "median":
 		if !windowApplied {
