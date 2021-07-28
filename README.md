@@ -31,26 +31,6 @@ For now there is only a Nodejs API found [here](https://github.com/a1c9lll/node-
 
 ## Using curl to test the database
 
-#### Create a metric
-
-```bash
-curl --header "Content-Type: application/json" \
-  --request POST \
-  --data '{"metric":"test0","tags":["id","type"]}' \
-  http://127.0.0.1:8981/create_metric
-```
-
-#### Check if a metric exists
-
-```bash
-curl http://127.0.0.1:8981/metric_exists?metric=test0
-```
-
-Response:
-```json
-{"exists":true}
-```
-
 #### Insert a point
 
 ```bash

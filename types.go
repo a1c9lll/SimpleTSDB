@@ -38,16 +38,3 @@ type pointsQuery struct {
 type serverError struct {
 	Error string `json:"error"`
 }
-
-type metricExistsResponse struct {
-	Exists bool `json:"exists"`
-}
-
-type createMetricRequest struct {
-	Metric string   `json:"metric"`
-	Tags   []string `json:"tags"`
-}
-
-type deleteMetricRequest struct {
-	Metric string `json:"metric"`
-}

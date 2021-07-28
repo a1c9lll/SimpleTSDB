@@ -34,6 +34,15 @@ func initDB(pgUser, pgPassword, pgHost string, pgPort int, pgDB, pgSSLMode strin
 	if err != nil {
 		log.Fatal(err)
 	}
+	session.Exec(`
+CREATE TABLE simpletsdb_metrics (
+	metric text,
+	value double precision,
+	timestamp bigint,
+	tags jsonb,
+	UNIQUE(metric, value, timestamp, tags)
+)
+	`)
 	if err := session.Ping(); err != nil {
 		log.Fatal(err)
 	}

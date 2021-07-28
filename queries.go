@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -16,191 +17,76 @@ var (
 	errUnsupportedTagName          = errors.New("valid characters for tag names are a-z, A-Z, 0-9, -, ., and _")
 	errUnsupportedTagValue         = errors.New("valid characters for tag values are a-z, A-Z, 0-9, -, ., and _")
 	errMetricRequired              = errors.New("metric is required")
-	errMetricExists                = errors.New("metric already exists")
 	errMetricDoesNotExist          = errors.New("metric does not exist")
 	errStartRequired               = errors.New("query start is required")
 	errEndRequired                 = errors.New("query end is required")
 	errPgTableNotExist             = `pq: relation "simpletsdb_%s" does not exist`
 	errPointRequiredForInsertQuery = errors.New("point required for insert query")
-	errSameMetricRequiredForInsert = errors.New("all metric names must be the same in an insert")
 )
 
-func generateMetricQuery(name string, tags []string) (string, error) {
-	buf := &strings.Builder{}
-	buf2 := &strings.Builder{}
-	for _, tag := range tags {
-		if !metricAndTagsRe.MatchString(tag) {
-			return "", errUnsupportedTagName
-		}
-		buf.WriteString("x_" + tag + " text,")
-		buf2.WriteString("x_" + tag + ",")
-	}
-	return fmt.Sprintf(`CREATE TABLE simpletsdb_%s (timestamp bigint,%svalue double precision,UNIQUE(timestamp,%svalue))`, name, buf.String(), buf2.String()), nil
-}
-
-func createMetric(name string, tags []string) error {
-	if name == "" {
-		return errMetricRequired
-	}
-	if !metricAndTagsRe.MatchString(name) {
-		return errUnsupportedMetricName
-	}
-	queryStr, err := generateMetricQuery(name, tags)
-	fmt.Println(queryStr)
-	if err != nil {
-		return err
-	}
-	if _, err = session.Query(queryStr); err != nil {
-		if err.Error() == fmt.Sprintf(`pq: relation "simpletsdb_%s" already exists`, name) {
-			return errMetricExists
-		}
-		return err
-	}
-	return nil
-}
-
-func metricExists(name string) (bool, error) {
-	if name == "" {
-		return false, errMetricRequired
-	}
-	if !metricAndTagsRe.MatchString(name) {
-		return false, errUnsupportedMetricName
-	}
-	var (
-		name0 string
-		found bool
-		err   error
-	)
-	scanner, err := session.Query("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';")
-	if err != nil {
-		return false, err
-	}
-	for scanner.Next() {
-		err = scanner.Scan(&name0)
-		if err != nil {
-			scanner.Close()
-			return false, err
-		}
-		if name0 == "simpletsdb_"+name {
-			found = true
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return false, err
-	}
-
-	return found, nil
-}
-
-func deleteMetric(name string) error {
-	if name == "" {
-		return errMetricRequired
-	}
-	if !metricAndTagsRe.MatchString(name) {
-		return errUnsupportedMetricName
-	}
-	_, err := session.Query(fmt.Sprintf("DROP TABLE simpletsdb_%s", name))
-	if err != nil {
-		if err.Error() == fmt.Sprintf(`pq: table "simpletsdb_%s" does not exist`, strings.ToLower(name)) {
-			return errMetricDoesNotExist
-		}
-		return err
-	}
-	return nil
-}
-
-func generatePointInsertionStringsAndValues(queries []*insertPointQuery, firstMetric string) (string, string, []interface{}, error) {
-	tagsStrBuilder, valuesStrBuilder := &strings.Builder{}, &strings.Builder{}
+func generatePointInsertionStringsAndValues(queries []*insertPointQuery) (string, []interface{}, error) {
+	valuesStrBuilder := &strings.Builder{}
 	values := []interface{}{}
-
-	tagsOrder := []string{}
-
-	for k, _ := range queries[0].Tags {
-		if !metricAndTagsRe.MatchString(k) {
-			return "", "", nil, errUnsupportedTagName
-		}
-		tagsOrder = append(tagsOrder, k)
-		tagsStrBuilder.WriteString("x_")
-		tagsStrBuilder.WriteString(k)
-		tagsStrBuilder.WriteString(",")
-	}
 
 	var i = 1
 	for z, query := range queries {
-		if query.Metric != firstMetric {
-			return "", "", nil, errSameMetricRequiredForInsert
-		}
 		if !metricAndTagsRe.MatchString(query.Metric) {
-			return "", "", nil, errUnsupportedMetricName
+			return "", nil, errUnsupportedMetricName
 		}
 		if query.Point == nil {
-			return "", "", nil, errPointRequiredForInsertQuery
+			return "", nil, errPointRequiredForInsertQuery
 		}
+		values = append(values, query.Metric)
 		values = append(values, query.Point.Timestamp)
-		valuesStrBuilder.WriteString("($" + strconv.Itoa(i) + ",")
-		i++
-		for _, t := range tagsOrder {
-			v := query.Tags[t]
-			if !metricAndTagsRe.MatchString(v) {
-				return "", "", nil, errUnsupportedTagValue
-			}
-			valuesStrBuilder.WriteString("$" + strconv.Itoa(i) + ",")
-			i++
-			values = append(values, v)
-		}
 		values = append(values, query.Point.Value)
-		valuesStrBuilder.WriteString("$" + strconv.Itoa(i) + ")")
+
+		bs, _ := json.Marshal(query.Tags)
+		values = append(values, string(bs))
+
+		valuesStrBuilder.WriteString(fmt.Sprintf("($%d,$%d,$%d,$%d)", i, i+1, i+2, i+3))
 		if z+1 < len(queries) {
 			valuesStrBuilder.WriteString(",")
 		}
-		i++
+		i += 4
 	}
-	return tagsStrBuilder.String(), valuesStrBuilder.String(), values, nil
+	return valuesStrBuilder.String(), values, nil
 }
 
-/*
-Must all be the same metric name
-Must not be duplicates of (timestamp, value)
-*/
 func insertPoints(queries0 []*insertPointQuery) error {
 	if len(queries0) == 0 {
 		return nil
 	}
 	// batch the queries 200 at a time to get around
 	// max insert limit of postgres
-	firstMetric := queries0[0].Metric
 	for i := 0; i < len(queries0); i += insertBatchSize {
 		queries := queries0[i:min1(i+insertBatchSize, len(queries0))]
-		tagsStr, valuesStr, values, err := generatePointInsertionStringsAndValues(queries, firstMetric)
+		valuesStr, values, err := generatePointInsertionStringsAndValues(queries)
 		if err != nil {
 			return err
 		}
-		queryStr := fmt.Sprintf(`INSERT INTO simpletsdb_%s (timestamp,%svalue) VALUES %s ON CONFLICT DO NOTHING`, firstMetric, tagsStr, valuesStr)
+		queryStr := fmt.Sprintf(`INSERT INTO simpletsdb_metrics (metric,timestamp,value,tags) VALUES %s ON CONFLICT DO NOTHING`, valuesStr)
 		if _, err := session.Exec(queryStr, values...); err != nil { //&& err.Error() != fmt.Sprintf(errStringDuplicate, strings.ToLower(firstMetric)) {
-			if err.Error() == fmt.Sprintf(errPgTableNotExist, strings.ToLower(firstMetric)) {
-				return errMetricDoesNotExist
-			}
 			return err
 		}
 	}
 	return nil
 }
 
-func generateTagsQueryString(tags map[string]string, queryVals []interface{}, argsCounter int) (string, []interface{}, int, error) {
+func generateTagsQueryString(tags map[string]string, queryVals []interface{}) (string, []interface{}, error) {
 	s := &strings.Builder{}
+	argsCounter := 3
 	for k, v := range tags {
 		if !metricAndTagsRe.MatchString(k) {
-			return "", nil, 0, errUnsupportedTagName
+			return "", nil, errUnsupportedTagName
 		}
 		if !metricAndTagsRe.MatchString(v) {
-			return "", nil, 0, errUnsupportedTagValue
+			return "", nil, errUnsupportedTagValue
 		}
-		s.WriteString(fmt.Sprintf(" AND x_%s = $%s", k, strconv.Itoa(argsCounter+1)))
+		s.WriteString(fmt.Sprintf(" AND tags->>'%s' = $%s", k, strconv.Itoa(argsCounter+1)))
 		argsCounter++
 		queryVals = append(queryVals, v)
 	}
-	return s.String(), queryVals, argsCounter - 1, nil
+	return s.String(), queryVals, nil
 }
 
 func queryPoints(query *pointsQuery) ([]*point, error) {
@@ -229,17 +115,17 @@ func queryPoints(query *pointsQuery) ([]*point, error) {
 	}
 
 	queryVals := []interface{}{
-		query.Start, query.End,
+		query.Metric, query.Start, query.End,
 	}
 
 	if len(query.Tags) > 0 {
-		tagStr, queryVals, _, err = generateTagsQueryString(query.Tags, queryVals, 2)
+		tagStr, queryVals, err = generateTagsQueryString(query.Tags, queryVals)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	queryStr := fmt.Sprintf(`SELECT timestamp, value FROM simpletsdb_%s WHERE timestamp >= $1 AND timestamp <= $2%s ORDER BY timestamp ASC%s`, query.Metric, tagStr, limitStr)
+	queryStr := fmt.Sprintf(`SELECT timestamp, value FROM simpletsdb_metrics WHERE metric = $1 AND timestamp >= $2 AND timestamp <= $3%s ORDER BY timestamp ASC%s`, tagStr, limitStr)
 
 	scanner, err := session.Query(queryStr, queryVals...)
 	var (
@@ -324,23 +210,20 @@ func deletePoints(query *deletePointsQuery) error {
 	)
 
 	queryVals := []interface{}{
-		query.Start, query.End,
+		query.Metric, query.Start, query.End,
 	}
 
 	if len(query.Tags) > 0 {
-		tagStr, queryVals, _, err = generateTagsQueryString(query.Tags, queryVals, 2)
+		tagStr, queryVals, err = generateTagsQueryString(query.Tags, queryVals)
 		if err != nil {
 			return err
 		}
 	}
 
-	queryStr := fmt.Sprintf(`DELETE FROM simpletsdb_%s WHERE timestamp >= $1 AND timestamp <= $2%s`, query.Metric, tagStr)
+	queryStr := fmt.Sprintf(`DELETE FROM simpletsdb_metrics WHERE metric = $1 AND timestamp >= $2 AND timestamp <= $3%s`, tagStr)
 
-	if resp, err := session.Query(queryStr, queryVals...); err != nil {
-		resp.Close()
-		return nil
-	} else {
-		resp.Close()
+	if _, err := session.Exec(queryStr, queryVals...); err != nil {
+		return err
 	}
 	return nil
 }

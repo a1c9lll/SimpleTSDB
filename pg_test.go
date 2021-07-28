@@ -26,39 +26,9 @@ func TestMain(t *testing.T) {
 	}
 	initDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], port, cfg["postgres_db"]+"_test", cfg["postgres_ssl_mode"])
 
-	deleteMetric("test0")
-	deleteMetric("test1")
-	deleteMetric("test2")
-
-	err = createMetric("test0", []string{"id", "type"})
+	_, err = session.Exec("DELETE FROM simpletsdb_metrics WHERE true")
 	if err != nil {
 		t.Fatal(err)
-	}
-	deleteMetric("test7")
-
-	err = createMetric("test7", []string{"id", "type"})
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestInvalidMetricName(t *testing.T) {
-	err := createMetric("a b", []string{})
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	if err != errUnsupportedMetricName {
-		t.Fatalf("wrong error: %s", err)
-	}
-}
-
-func TestInvalidTags(t *testing.T) {
-	err := createMetric("ab", []string{"c d"})
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	if err != errUnsupportedTagName {
-		t.Fatalf("wrong error: %s", err)
 	}
 }
 
@@ -87,16 +57,6 @@ func TestMetricRequired(t *testing.T) {
 		t.Fatal("expected error")
 	} else if err != errMetricRequired {
 		t.Fatalf("wrong error: %s", err)
-	}
-}
-
-func TestMetricExists(t *testing.T) {
-	found, err := metricExists("test0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !found {
-		t.Fatal("metric test0 doesn't exist")
 	}
 }
 
@@ -159,12 +119,6 @@ func TestInsertPointAndQuery(t *testing.T) {
 }
 
 func TestDeletePoints(t *testing.T) {
-	deleteMetric("test9")
-	err := createMetric("test9", []string{"id"})
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	baseTime := time.Now().Add(-time.Minute * 50)
 	pts := []*insertPointQuery{}
 	for i := 0; i < 10; i++ {
@@ -180,7 +134,7 @@ func TestDeletePoints(t *testing.T) {
 		})
 	}
 
-	err = insertPoints(pts)
+	err := insertPoints(pts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,13 +169,10 @@ func TestDeletePoints(t *testing.T) {
 		{Value: 8, Timestamp: baseTime.Add(time.Minute * 40).UnixNano()},
 		{Value: 9, Timestamp: baseTime.Add(time.Minute * 45).UnixNano()},
 	}, points)
+
 }
 
 func TestDuplicateInsert(t *testing.T) {
-	err := createMetric("test2", []string{})
-	if err != nil {
-		t.Fatal(err)
-	}
 	timestamp := time.Now().UnixNano()
 	insertPts := []*insertPointQuery{
 		{
@@ -232,7 +183,7 @@ func TestDuplicateInsert(t *testing.T) {
 			},
 		},
 	}
-	err = insertPoints(insertPts)
+	err := insertPoints(insertPts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,24 +216,7 @@ func TestDuplicateInsert(t *testing.T) {
 	}
 }
 
-func TestQueryNonexistentMetric(t *testing.T) {
-	_, err := queryPoints(&pointsQuery{
-		Metric: "ajd29jfj",
-		Start:  mustParseTime("2000-01-01T00:00:00Z").UnixNano(),
-	})
-	if err == nil {
-		t.Fatal("expected error")
-	} else if err.Error() != `metric does not exist` {
-		t.Fatal("wrong error")
-	}
-}
-
 func TestWindowAggregator(t *testing.T) {
-	err := createMetric("test1", []string{"id"})
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	baseTime := time.Now().Add(-time.Minute * 15)
 	insertPts := []*insertPointQuery{}
 	for i := 0; i < 3; i++ {
@@ -298,7 +232,7 @@ func TestWindowAggregator(t *testing.T) {
 		})
 	}
 
-	err = insertPoints(insertPts)
+	err := insertPoints(insertPts)
 	if err != nil {
 		t.Fatal(err)
 	}
