@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"strconv"
 	"time"
 
@@ -8,10 +9,13 @@ import (
 )
 
 func main() {
+	configLocation := flag.String("config", "./config", "path to the configuration file")
+	flag.Parse()
+
 	log.Info("Starting SimpleTSDB")
 	// load config
 	cfg := map[string]string{}
-	if err := loadConfig("config", cfg); err != nil {
+	if err := loadConfig(*configLocation, cfg); err != nil {
 		log.Fatal(err)
 	}
 	// init db
