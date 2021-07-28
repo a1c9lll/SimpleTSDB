@@ -20,7 +20,6 @@ var (
 	errMetricDoesNotExist          = errors.New("metric does not exist")
 	errStartRequired               = errors.New("query start is required")
 	errEndRequired                 = errors.New("query end is required")
-	errStringDuplicate             = `pq: duplicate key value violates unique constraint "simpletsdb_%s_timestamp_value_key"`
 	errPgTableNotExist             = `pq: relation "simpletsdb_%s" does not exist`
 	errPointRequiredForInsertQuery = errors.New("point required for insert query")
 	errSameMetricRequiredForInsert = errors.New("all metric names must be the same in an insert")
@@ -28,13 +27,15 @@ var (
 
 func generateMetricQuery(name string, tags []string) (string, error) {
 	buf := &strings.Builder{}
+	buf2 := &strings.Builder{}
 	for _, tag := range tags {
 		if !metricAndTagsRe.MatchString(tag) {
 			return "", errUnsupportedTagName
 		}
 		buf.WriteString("x_" + tag + " text,")
+		buf2.WriteString("x_" + tag + ",")
 	}
-	return fmt.Sprintf(`CREATE TABLE simpletsdb_%s (timestamp bigint,%svalue double precision,UNIQUE(timestamp,value))`, name, buf.String()), nil
+	return fmt.Sprintf(`CREATE TABLE simpletsdb_%s (timestamp bigint,%svalue double precision,UNIQUE(timestamp,%svalue))`, name, buf.String(), buf2.String()), nil
 }
 
 func createMetric(name string, tags []string) error {
@@ -45,6 +46,7 @@ func createMetric(name string, tags []string) error {
 		return errUnsupportedMetricName
 	}
 	queryStr, err := generateMetricQuery(name, tags)
+	fmt.Println(queryStr)
 	if err != nil {
 		return err
 	}
@@ -100,7 +102,7 @@ func deleteMetric(name string) error {
 	}
 	_, err := session.Query(fmt.Sprintf("DROP TABLE simpletsdb_%s", name))
 	if err != nil {
-		if err.Error() == fmt.Sprintf(`pq: table "simpletsdb_%s" does not exist`, name) {
+		if err.Error() == fmt.Sprintf(`pq: table "simpletsdb_%s" does not exist`, strings.ToLower(name)) {
 			return errMetricDoesNotExist
 		}
 		return err
@@ -174,9 +176,9 @@ func insertPoints(queries0 []*insertPointQuery) error {
 		if err != nil {
 			return err
 		}
-		queryStr := fmt.Sprintf(`INSERT INTO simpletsdb_%s (timestamp,%svalue) VALUES %s`, firstMetric, tagsStr, valuesStr)
-		if _, err := session.Exec(queryStr, values...); err != nil && err.Error() != fmt.Sprintf(errStringDuplicate, firstMetric) {
-			if err.Error() == fmt.Sprintf(errPgTableNotExist, firstMetric) {
+		queryStr := fmt.Sprintf(`INSERT INTO simpletsdb_%s (timestamp,%svalue) VALUES %s ON CONFLICT DO NOTHING`, firstMetric, tagsStr, valuesStr)
+		if _, err := session.Exec(queryStr, values...); err != nil { //&& err.Error() != fmt.Sprintf(errStringDuplicate, strings.ToLower(firstMetric)) {
+			if err.Error() == fmt.Sprintf(errPgTableNotExist, strings.ToLower(firstMetric)) {
 				return errMetricDoesNotExist
 			}
 			return err
