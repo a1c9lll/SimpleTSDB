@@ -13,7 +13,7 @@ import (
 func TestMain(t *testing.T) {
 	log.SetLevel(log.FatalLevel)
 	cfg := map[string]string{}
-	if err := loadConfig("./config", cfg); err != nil {
+	if err := loadConfig("./config/simpletsdb-dev.conf", cfg); err != nil {
 		t.Fatal(err)
 	}
 	port, err := strconv.Atoi(cfg["postgres_port"])

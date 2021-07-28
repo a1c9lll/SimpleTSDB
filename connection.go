@@ -10,7 +10,8 @@ import (
 )
 
 var (
-	session *sql.DB
+	session      *sql.DB
+	metricsTable = `simpletsdb_metrics`
 )
 
 func initDB(pgUser, pgPassword, pgHost string, pgPort int, pgDB, pgSSLMode string) {
@@ -28,22 +29,36 @@ func initDB(pgUser, pgPassword, pgHost string, pgPort int, pgDB, pgSSLMode strin
 		log.Fatal(err)
 	}
 	session.Exec(fmt.Sprintf("create database %s", pgDB))
+	if ok, err := databaseExists(pgDB); err != nil {
+		log.Fatal(err)
+	} else if !ok {
+		log.Fatalf("could not create database %s", pgDB)
+	}
+	session.Close()
 
 	connStr := fmt.Sprintf("user=%s %shost='%s' port=%d dbname=%s sslmode=%s", pgUser, passwordString, pgHost, pgPort, pgDB, pgSSLMode)
 	session, err = sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatal(err)
 	}
-	session.Exec(`
-CREATE TABLE simpletsdb_metrics (
+	if err := session.Ping(); err != nil {
+		log.Fatal(err)
+	}
+
+	session.Exec(fmt.Sprintf(`
+CREATE TABLE %s (
 	metric text,
 	value double precision,
 	timestamp bigint,
 	tags jsonb,
 	UNIQUE(metric, value, timestamp, tags)
 )
-	`)
-	if err := session.Ping(); err != nil {
+	`, metricsTable))
+
+	if ok, err := tableExists(metricsTable); err != nil {
 		log.Fatal(err)
+	} else if !ok {
+		log.Fatalf("could not create %s table", metricsTable)
 	}
+
 }

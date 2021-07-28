@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	configLocation := flag.String("config", "./config", "path to the configuration file")
+	configLocation := flag.String("config", "./config/simpletsdb.conf", "path to the configuration file")
 	flag.Parse()
 
 	log.Info("Starting SimpleTSDB")

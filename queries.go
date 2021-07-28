@@ -11,20 +11,81 @@ import (
 )
 
 var (
-	metricAndTagsRe                = regexp.MustCompile(`^[a-zA-Z0-9_\-.]+$`)
+	metricAndTagsRe                = regexp.MustCompile(`^[a-zA-Z0-9_\-.@]+$`)
 	insertBatchSize                = 200
-	errUnsupportedMetricName       = errors.New("valid characters for metrics are a-z, A-Z, 0-9, -, ., and _")
-	errUnsupportedTagName          = errors.New("valid characters for tag names are a-z, A-Z, 0-9, -, ., and _")
-	errUnsupportedTagValue         = errors.New("valid characters for tag values are a-z, A-Z, 0-9, -, ., and _")
+	errUnsupportedMetricName       = errors.New("valid characters for metrics are [a-zA-Z0-9\\-._]")
+	errUnsupportedTagName          = errors.New("valid characters for tag names are [a-zA-Z0-9\\-._@]")
+	errUnsupportedTagValue         = errors.New("valid characters for tag values are [a-zA-Z0-9\\-._@]")
 	errMetricRequired              = errors.New("metric is required")
 	errMetricDoesNotExist          = errors.New("metric does not exist")
 	errStartRequired               = errors.New("query start is required")
 	errEndRequired                 = errors.New("query end is required")
-	errPgTableNotExist             = `pq: relation "simpletsdb_%s" does not exist`
 	errPointRequiredForInsertQuery = errors.New("point required for insert query")
 )
 
-func generatePointInsertionStringsAndValues(queries []*insertPointQuery) (string, []interface{}, error) {
+func databaseExists(name string) (bool, error) {
+	var (
+		name0 string
+		found bool
+		err   error
+	)
+	scanner, err := session.Query(fmt.Sprintf("SELECT datname FROM pg_database WHERE datname='%s';", name))
+	if err != nil {
+		return false, err
+	}
+
+	defer scanner.Close()
+
+	for scanner.Next() {
+		err = scanner.Scan(&name0)
+		if err != nil {
+			scanner.Close()
+			return false, err
+		}
+		if name0 == name {
+			found = true
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return false, err
+	}
+
+	return found, nil
+}
+
+func tableExists(name string) (bool, error) {
+	var (
+		name0 string
+		found bool
+		err   error
+	)
+	scanner, err := session.Query(fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND table_name='%s';", name))
+	if err != nil {
+		return false, err
+	}
+
+	defer scanner.Close()
+
+	for scanner.Next() {
+		err = scanner.Scan(&name0)
+		if err != nil {
+			scanner.Close()
+			return false, err
+		}
+		if name0 == name {
+			found = true
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return false, err
+	}
+
+	return found, nil
+}
+
+func generateInsertStringsAndValues(queries []*insertPointQuery) (string, []interface{}, error) {
 	valuesStrBuilder := &strings.Builder{}
 	values := []interface{}{}
 
@@ -40,7 +101,10 @@ func generatePointInsertionStringsAndValues(queries []*insertPointQuery) (string
 		values = append(values, query.Point.Timestamp)
 		values = append(values, query.Point.Value)
 
-		bs, _ := json.Marshal(query.Tags)
+		bs, err := json.Marshal(query.Tags)
+		if err != nil {
+			return "", nil, err
+		}
 		values = append(values, string(bs))
 
 		valuesStrBuilder.WriteString(fmt.Sprintf("($%d,$%d,$%d,$%d)", i, i+1, i+2, i+3))
@@ -56,15 +120,15 @@ func insertPoints(queries0 []*insertPointQuery) error {
 	if len(queries0) == 0 {
 		return nil
 	}
-	// batch the queries 200 at a time to get around
+	// batch the queries insertBatchSize at a time to get around
 	// max insert limit of postgres
 	for i := 0; i < len(queries0); i += insertBatchSize {
 		queries := queries0[i:min1(i+insertBatchSize, len(queries0))]
-		valuesStr, values, err := generatePointInsertionStringsAndValues(queries)
+		valuesStr, values, err := generateInsertStringsAndValues(queries)
 		if err != nil {
 			return err
 		}
-		queryStr := fmt.Sprintf(`INSERT INTO simpletsdb_metrics (metric,timestamp,value,tags) VALUES %s ON CONFLICT DO NOTHING`, valuesStr)
+		queryStr := fmt.Sprintf(`INSERT INTO %s (metric,timestamp,value,tags) VALUES %s ON CONFLICT DO NOTHING`, metricsTable, valuesStr)
 		if _, err := session.Exec(queryStr, values...); err != nil { //&& err.Error() != fmt.Sprintf(errStringDuplicate, strings.ToLower(firstMetric)) {
 			return err
 		}
@@ -72,7 +136,7 @@ func insertPoints(queries0 []*insertPointQuery) error {
 	return nil
 }
 
-func generateTagsQueryString(tags map[string]string, queryVals []interface{}) (string, []interface{}, error) {
+func generateTagsQueryStringAndValues(tags map[string]string, queryVals []interface{}) (string, []interface{}, error) {
 	s := &strings.Builder{}
 	argsCounter := 3
 	for k, v := range tags {
@@ -119,13 +183,13 @@ func queryPoints(query *pointsQuery) ([]*point, error) {
 	}
 
 	if len(query.Tags) > 0 {
-		tagStr, queryVals, err = generateTagsQueryString(query.Tags, queryVals)
+		tagStr, queryVals, err = generateTagsQueryStringAndValues(query.Tags, queryVals)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	queryStr := fmt.Sprintf(`SELECT timestamp, value FROM simpletsdb_metrics WHERE metric = $1 AND timestamp >= $2 AND timestamp <= $3%s ORDER BY timestamp ASC%s`, tagStr, limitStr)
+	queryStr := fmt.Sprintf(`SELECT timestamp, value FROM %s WHERE metric = $1 AND timestamp >= $2 AND timestamp <= $3%s ORDER BY timestamp ASC%s`, metricsTable, tagStr, limitStr)
 
 	scanner, err := session.Query(queryStr, queryVals...)
 	var (
@@ -134,9 +198,6 @@ func queryPoints(query *pointsQuery) ([]*point, error) {
 		points    []*point
 	)
 	if err != nil {
-		if err.Error() == fmt.Sprintf(errPgTableNotExist, query.Metric) {
-			return nil, errMetricDoesNotExist
-		}
 		return nil, err
 	}
 	for scanner.Next() {
@@ -150,6 +211,8 @@ func queryPoints(query *pointsQuery) ([]*point, error) {
 			Timestamp: timestamp,
 		})
 	}
+
+	scanner.Close()
 
 	if err := scanner.Err(); err != nil {
 		return nil, err
@@ -214,13 +277,13 @@ func deletePoints(query *deletePointsQuery) error {
 	}
 
 	if len(query.Tags) > 0 {
-		tagStr, queryVals, err = generateTagsQueryString(query.Tags, queryVals)
+		tagStr, queryVals, err = generateTagsQueryStringAndValues(query.Tags, queryVals)
 		if err != nil {
 			return err
 		}
 	}
 
-	queryStr := fmt.Sprintf(`DELETE FROM simpletsdb_metrics WHERE metric = $1 AND timestamp >= $2 AND timestamp <= $3%s`, tagStr)
+	queryStr := fmt.Sprintf(`DELETE FROM %s WHERE metric = $1 AND timestamp >= $2 AND timestamp <= $3%s`, metricsTable, tagStr)
 
 	if _, err := session.Exec(queryStr, queryVals...); err != nil {
 		return err
