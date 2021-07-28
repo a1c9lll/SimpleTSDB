@@ -73,7 +73,7 @@ None
 
 None
 
-#### Max
+#### Count
 
 ###### Name: `count`
 
