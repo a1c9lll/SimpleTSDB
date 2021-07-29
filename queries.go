@@ -7,15 +7,20 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var (
-	metricAndTagsRe                = regexp.MustCompile(`^[a-zA-Z0-9_\-.@]+$`)
+	tagsIndexMap                   = map[string]bool{}
+	tagsIndexMapMutex              = &sync.Mutex{}
+	metricAndTagsRe                = regexp.MustCompile(`^[a-zA-Z0-9_\-.]+$`)
 	insertBatchSize                = 200
 	errUnsupportedMetricName       = errors.New("valid characters for metrics are [a-zA-Z0-9\\-._]")
-	errUnsupportedTagName          = errors.New("valid characters for tag names are [a-zA-Z0-9\\-._@]")
-	errUnsupportedTagValue         = errors.New("valid characters for tag values are [a-zA-Z0-9\\-._@]")
+	errUnsupportedTagName          = errors.New("valid characters for tag names are [a-zA-Z0-9\\-._]")
+	errUnsupportedTagValue         = errors.New("valid characters for tag values are [a-zA-Z0-9\\-._]")
 	errMetricRequired              = errors.New("metric is required")
 	errMetricDoesNotExist          = errors.New("metric does not exist")
 	errStartRequired               = errors.New("query start is required")
@@ -85,6 +90,39 @@ func tableExists(name string) (bool, error) {
 	return found, nil
 }
 
+func createIndex(field string) error {
+	query := fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_%s ON %s((tags->>'%s'))", metricsTable, field, metricsTable, field)
+	_, err := session.Exec(query)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func createIndices() {
+	// make a copy of tagsIndexMap so we can unlock the mutex. we do this because createIndex might take a while
+	m := map[string]bool{}
+
+	tagsIndexMapMutex.Lock()
+	for k, v := range tagsIndexMap {
+		m[k] = v
+	}
+	tagsIndexMapMutex.Unlock()
+
+	for k, v := range m {
+		if !v {
+			err := createIndex(k)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			tagsIndexMapMutex.Lock()
+			tagsIndexMap[k] = true
+			tagsIndexMapMutex.Unlock()
+		}
+	}
+}
+
 func generateInsertStringsAndValues(queries []*insertPointQuery) (string, []interface{}, error) {
 	valuesStrBuilder := &strings.Builder{}
 	values := []interface{}{}
@@ -100,6 +138,15 @@ func generateInsertStringsAndValues(queries []*insertPointQuery) (string, []inte
 		values = append(values, query.Metric)
 		values = append(values, query.Point.Timestamp)
 		values = append(values, query.Point.Value)
+
+		// check if any of the tags have not been checked for indexing
+		tagsIndexMapMutex.Lock()
+		for k := range query.Tags {
+			if _, ok := tagsIndexMap[k]; !ok {
+				tagsIndexMap[k] = false
+			}
+		}
+		tagsIndexMapMutex.Unlock()
 
 		bs, err := json.Marshal(query.Tags)
 		if err != nil {
@@ -133,6 +180,9 @@ func insertPoints(queries0 []*insertPointQuery) error {
 			return err
 		}
 	}
+
+	go createIndices()
+
 	return nil
 }
 
@@ -146,6 +196,13 @@ func generateTagsQueryStringAndValues(tags map[string]string, queryVals []interf
 		if !metricAndTagsRe.MatchString(v) {
 			return "", nil, errUnsupportedTagValue
 		}
+		// check if tag is missing from index map, then schedule it for indexing if it is missing
+		tagsIndexMapMutex.Lock()
+		if _, ok := tagsIndexMap[k]; !ok {
+			tagsIndexMap[k] = false
+		}
+		tagsIndexMapMutex.Unlock()
+
 		s.WriteString(fmt.Sprintf(" AND tags->>'%s' = $%s", k, strconv.Itoa(argsCounter+1)))
 		argsCounter++
 		queryVals = append(queryVals, v)
@@ -188,6 +245,8 @@ func queryPoints(query *pointsQuery) ([]*point, error) {
 			return nil, err
 		}
 	}
+
+	go createIndices()
 
 	queryStr := fmt.Sprintf(`SELECT timestamp, value FROM %s WHERE metric = $1 AND timestamp >= $2 AND timestamp <= $3%s ORDER BY timestamp ASC%s`, metricsTable, tagStr, limitStr)
 

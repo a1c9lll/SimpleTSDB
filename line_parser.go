@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	lineMatchRe      = regexp.MustCompile(`^\s*([a-zA-Z0-9\-_.]+)\s*,\s*((?:[a-zA-Z0-9\-_.@]+\s*=\s*[a-zA-Z0-9\-_.@]+\s*)*)\s*,\s*([+-]?([0-9]+([.][0-9]*)?|[.][0-9]+))\s+([0-9]+)\s*$`)
+	lineMatchRe      = regexp.MustCompile(`^\s*([a-zA-Z0-9\-_.]+)\s*,\s*((?:[a-zA-Z0-9\-_.]+\s*=\s*[a-zA-Z0-9\-_.]+\s*)*)\s*,\s*([+-]?([0-9]+([.][0-9]*)?|[.][0-9]+))\s+([0-9]+)\s*$`)
 	errNoMatches     = errors.New("parse line: invalid line protocol syntax - no matches")
 	errInvalidSyntax = errors.New("parse line: invalid line protocol syntax")
 )
