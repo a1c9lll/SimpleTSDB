@@ -53,22 +53,6 @@ func TestDownsample(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	/*
-			ID                    int64            `json:"id"`
-		Metric                string           `json:"metric"`
-		OutMetric             string           `json:"outMetric"`
-		RunEvery              string           `json:"runEvery"`
-		RunEveryDur           time.Duration    `json:"-"`
-		Query                 *downsampleQuery `json:"query"`
-		LastDownsampledWindow int64            `json:"-"`
-	*/
-	/*
-			type downsampleQuery struct {
-			Aggregators []*aggregatorQuery     `json:"aggregators"`
-			Window      map[string]interface{} `json:"window"`
-			Tags        map[string]string      `json:"tags"`
-		}
-	*/
 	if err := downsample(&downsampler{
 		Metric:      "test09z",
 		OutMetric:   "test09z_15m",

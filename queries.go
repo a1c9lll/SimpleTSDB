@@ -17,7 +17,6 @@ import (
 
 var (
 	tagsIndexMap                           = map[string]bool{}
-	tagsIndexMapMutex                      = &sync.Mutex{}
 	createIndexMutex                       = &sync.Mutex{}
 	metricAndTagsRe                        = regexp.MustCompile(`^[a-zA-Z0-9_\-.]+$`)
 	insertBatchSize                        = 200
@@ -153,7 +152,27 @@ func selectDownsamplers() ([]*downsampler, error) {
 	return downsamplers0, nil
 }
 
-func createIndex(tags []string) error {
+func generateTagsIndexString(ss []string) string {
+	s := &strings.Builder{}
+	for _, s0 := range ss {
+		s.WriteString(s0)
+		s.WriteString("_")
+	}
+	return s.String()
+}
+
+func createIndex(tags []string) {
+	s := generateTagsIndexString(tags)
+
+	createIndexMutex.Lock()
+	defer createIndexMutex.Unlock()
+
+	if v, ok := tagsIndexMap[s]; ok {
+		if v {
+			return
+		}
+	}
+
 	indexNameStr := &strings.Builder{}
 	indexSchemaStr := &strings.Builder{}
 
@@ -172,56 +191,36 @@ func createIndex(tags []string) error {
 	query := fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_%s ON %s(%s)", metricsTable, indexNameStr.String(), metricsTable, indexSchemaStr.String())
 	_, err := session.Exec(query)
 	if err != nil {
-		return err
-	}
-	log.Infof("create index %v took %s", indexNameStr.String(), time.Since(t0))
-	return nil
-}
-
-func createIndices() {
-	createIndexMutex.Lock()
-	tags := []string{}
-
-	tagsIndexMapMutex.Lock()
-	for k, v := range tagsIndexMap {
-		if !v {
-			tags = append(tags, k)
-		}
-	}
-	tagsIndexMapMutex.Unlock()
-
-	if len(tags) == 0 {
-		return
-	}
-
-	sort.Strings(tags)
-
-	err := createIndex(tags)
-	if err != nil {
 		log.Error(err)
-		return
-	}
-
-	tagsIndexMapMutex.Lock()
-	for _, s := range tags {
+	} else {
 		tagsIndexMap[s] = true
 	}
-	tagsIndexMapMutex.Unlock()
-	createIndexMutex.Unlock()
+	log.Infof("create index if not exists %v took %s", indexNameStr.String(), time.Since(t0))
 }
 
-func generateInsertStringsAndValues(queries []*insertPointQuery) (string, []interface{}, error) {
+func uniqueTags(haystack [][]string, needle []string) bool {
+	m := map[string]struct{}{}
+	for _, s := range haystack {
+		m[generateTagsIndexString(s)] = struct{}{}
+	}
+	_, ok := m[generateTagsIndexString(needle)]
+
+	return !ok
+}
+
+func generateInsertStringsAndValues(queries []*insertPointQuery) (string, []interface{}, [][]string, error) {
 	valuesStrBuilder := &strings.Builder{}
 	values := []interface{}{}
-
+	uniqueTagCombinations := [][]string{}
 	var i = 1
 	for z, query := range queries {
 		if !metricAndTagsRe.MatchString(query.Metric) {
-			return "", nil, errUnsupportedMetricName
+			return "", nil, nil, errUnsupportedMetricName
 		}
 		if query.Point == nil {
-			return "", nil, errPointRequiredForInsertQuery
+			return "", nil, nil, errPointRequiredForInsertQuery
 		}
+
 		values = append(values, query.Metric)
 		values = append(values, query.Point.Timestamp)
 		if query.Point.Null {
@@ -229,18 +228,10 @@ func generateInsertStringsAndValues(queries []*insertPointQuery) (string, []inte
 		} else {
 			values = append(values, query.Point.Value)
 		}
-		// check if any of the tags have not been checked for indexing
-		tagsIndexMapMutex.Lock()
-		for k := range query.Tags {
-			if _, ok := tagsIndexMap[k]; !ok {
-				tagsIndexMap[k] = false
-			}
-		}
-		tagsIndexMapMutex.Unlock()
 
 		bs, err := json.Marshal(query.Tags)
 		if err != nil {
-			return "", nil, err
+			return "", nil, nil, err
 		}
 		values = append(values, string(bs))
 
@@ -249,8 +240,22 @@ func generateInsertStringsAndValues(queries []*insertPointQuery) (string, []inte
 			valuesStrBuilder.WriteString(",")
 		}
 		i += 4
+
+		// get unique combinations of tags for indexing
+		tags := make([]string, len(query.Tags))
+
+		x := 0
+		for k := range query.Tags {
+			tags[x] = k
+			x++
+		}
+
+		sort.Strings(tags)
+		if uniqueTags(uniqueTagCombinations, tags) {
+			uniqueTagCombinations = append(uniqueTagCombinations, tags)
+		}
 	}
-	return valuesStrBuilder.String(), values, nil
+	return valuesStrBuilder.String(), values, uniqueTagCombinations, nil
 }
 
 func insertPoints(queries0 []*insertPointQuery) error {
@@ -261,17 +266,21 @@ func insertPoints(queries0 []*insertPointQuery) error {
 	// max insert limit of postgres
 	for i := 0; i < len(queries0); i += insertBatchSize {
 		queries := queries0[i:min1(i+insertBatchSize, len(queries0))]
-		valuesStr, values, err := generateInsertStringsAndValues(queries)
+		valuesStr, values, uniqueTagCombinations, err := generateInsertStringsAndValues(queries)
 		if err != nil {
 			return err
+		}
+		for _, s := range uniqueTagCombinations {
+			if len(s) == 0 {
+				continue
+			}
+			go createIndex(s)
 		}
 		queryStr := fmt.Sprintf(`INSERT INTO %s (metric,timestamp,value,tags) VALUES %s ON CONFLICT DO NOTHING`, metricsTable, valuesStr)
 		if _, err := session.Exec(queryStr, values...); err != nil { //&& err.Error() != fmt.Sprintf(errStringDuplicate, strings.ToLower(firstMetric)) {
 			return err
 		}
 	}
-
-	go createIndices()
 
 	return nil
 }
@@ -286,12 +295,6 @@ func generateTagsQueryStringAndValues(tags map[string]string, queryVals []interf
 		if !metricAndTagsRe.MatchString(v) {
 			return "", nil, errUnsupportedTagValue
 		}
-		// check if tag is missing from index map, then schedule it for indexing if it is missing
-		tagsIndexMapMutex.Lock()
-		if _, ok := tagsIndexMap[k]; !ok {
-			tagsIndexMap[k] = false
-		}
-		tagsIndexMapMutex.Unlock()
 
 		s.WriteString(fmt.Sprintf(" AND tags->>'%s' = $%s", k, strconv.Itoa(argsCounter+1)))
 		argsCounter++
@@ -320,7 +323,6 @@ func queryPoints(query *pointsQuery) ([]*point, error) {
 		tagStr   string
 		err      error
 	)
-
 	if query.N > 0 {
 		limitStr = fmt.Sprintf(" LIMIT %d", query.N)
 	}
@@ -334,9 +336,18 @@ func queryPoints(query *pointsQuery) ([]*point, error) {
 		if err != nil {
 			return nil, err
 		}
-	}
 
-	go createIndices()
+		if len(query.Tags) > 0 {
+			tags := make([]string, len(query.Tags))
+			i := 0
+			for k := range query.Tags {
+				tags[i] = k
+				i++
+			}
+			sort.Strings(tags)
+			go createIndex(tags)
+		}
+	}
 
 	queryStr := fmt.Sprintf(`SELECT timestamp, value FROM %s WHERE metric = $1 AND timestamp >= $2 AND timestamp <= $3%s ORDER BY timestamp ASC%s`, metricsTable, tagStr, limitStr)
 
