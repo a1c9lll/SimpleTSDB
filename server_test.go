@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -162,4 +163,99 @@ func TestDeletePointsHandler(t *testing.T) {
 		{Value: 999, Timestamp: baseTime.UnixNano()},
 		{Value: 999, Timestamp: baseTime.Add(time.Minute * 4).UnixNano()},
 	}, points)
+}
+
+func TestDownsamplerAPI(t *testing.T) {
+	ds := &downsampler{
+		Metric:    "test123",
+		OutMetric: "test123_30m",
+		RunEvery:  "30m",
+		Query: &downsampleQuery{
+			Tags: map[string]string{
+				"id": "2",
+			},
+			Window: map[string]interface{}{
+				"every": "30m",
+			},
+			Aggregators: []*aggregatorQuery{
+				{Name: "mean"},
+			},
+		},
+	}
+
+	buf := &bytes.Buffer{}
+	if err := json.NewEncoder(buf).Encode(ds); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("POST", "/add_downsampler", buf)
+	req.Header.Add("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+
+	addDownsamplerHandler(w, req, nil)
+
+	resp := w.Result()
+
+	bod, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 {
+		t.Fatalf("got status code: %d, body: %s", resp.StatusCode, string(bod))
+	}
+
+	// Test list
+	req = httptest.NewRequest("GET", "/list_downsamplers", nil)
+
+	w = httptest.NewRecorder()
+
+	listDownsamplersHandler(w, req, nil)
+
+	resp = w.Result()
+
+	if resp.StatusCode != 200 {
+		t.Fatal()
+	}
+
+	downsamplers := []*downsampler{}
+	if err = json.NewDecoder(resp.Body).Decode(&downsamplers); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(downsamplers) == 0 {
+		t.Fatal("expected > 0 downsamplers")
+	}
+
+	// test delete
+	for _, d := range downsamplers {
+		buf := &bytes.Buffer{}
+		if err := json.NewEncoder(buf).Encode(&deleteDownsamplerRequest{
+			ID: d.ID,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		req := httptest.NewRequest("POST", "/delete_downsampler", buf)
+		req.Header.Add("Content-Type", "application/json")
+
+		w := httptest.NewRecorder()
+
+		deleteDownsamplerHandler(w, req, nil)
+
+		resp := w.Result()
+
+		body, _ := ioutil.ReadAll(resp.Body)
+		if resp.StatusCode != 200 {
+			t.Fatal(string(body))
+		}
+	}
+
+	ds0, err := selectDownsamplers()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(ds0) != 0 {
+		t.Fatalf("expected 0 downsamplers, got %d", len(ds0))
+	}
 }

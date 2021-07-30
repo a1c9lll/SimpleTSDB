@@ -21,6 +21,9 @@ func initServer(tsdbHost string, tsdbPort int, tsdbReadTimeout, tsdbWriteTimeout
 	router.POST("/insert_points", insertPointsHandler)
 	router.POST("/query_points", queryPointsHandler)
 	router.DELETE("/delete_points", deletePointsHandler)
+	router.POST("/add_downsampler", addDownsamplerHandler)
+	router.GET("/list_downsamplers", listDownsamplersHandler)
+	router.DELETE("/delete_downsampler", deleteDownsamplerHandler)
 
 	s := &http.Server{
 		Addr:           fmt.Sprintf("%s:%d", tsdbHost, tsdbPort),
@@ -203,6 +206,126 @@ func deletePointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 	}
 
 	if err := deletePoints(req); err != nil {
+		log.Error(err)
+		if err0 := write400Error(w, err.Error()); err0 != nil {
+			log.Error(err0)
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+/*
+Returns 400 on invalid request
+Returns 200 on successful request
+*/
+func addDownsamplerHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	log.Infof("add_downsampler request from %s", r.RemoteAddr)
+
+	typeHeader := r.Header.Values("Content-Type")
+
+	if len(typeHeader) != 1 {
+		log.Error("add_downsampler: content-type not set")
+		if err0 := write400Error(w, "content-type not set"); err0 != nil {
+			log.Error(err0)
+		}
+		return
+	}
+
+	if typeHeader[0] != "application/json" {
+		log.Error("add_downsampler: content-type must be application/json")
+		if err0 := write400Error(w, "content-type must be application/json"); err0 != nil {
+			log.Error(err0)
+		}
+		return
+	}
+
+	defer r.Body.Close()
+
+	req := &downsampler{}
+
+	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+		log.Error(err)
+		if err0 := write400Error(w, err.Error()); err0 != nil {
+			log.Error(err0)
+		}
+		return
+	}
+
+	err := addDownsampler(req)
+
+	if err != nil {
+		log.Error(err)
+		if err0 := write400Error(w, err.Error()); err0 != nil {
+			log.Error(err0)
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+/*
+Returns 200 on successful request
+Returns 500 on server failure
+*/
+func listDownsamplersHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	log.Infof("list_downsampler request from %s", r.RemoteAddr)
+
+	downsamplers, err := selectDownsamplers()
+	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	err = json.NewEncoder(w).Encode(downsamplers)
+	if err != nil {
+		log.Error(err)
+	}
+}
+
+/*
+Returns 400 on invalid request
+Returns 200 on successful request
+*/
+func deleteDownsamplerHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	log.Infof("delete_downsampler request from %s", r.RemoteAddr)
+
+	typeHeader := r.Header.Values("Content-Type")
+
+	if len(typeHeader) != 1 {
+		log.Error("delete_downsampler: content-type not set")
+		if err0 := write400Error(w, "content-type not set"); err0 != nil {
+			log.Error(err0)
+		}
+		return
+	}
+
+	if typeHeader[0] != "application/json" {
+		log.Error("delete_downsampler: content-type must be application/json")
+		if err0 := write400Error(w, "content-type must be application/json"); err0 != nil {
+			log.Error(err0)
+		}
+		return
+	}
+
+	defer r.Body.Close()
+
+	del := &deleteDownsamplerRequest{}
+	if err := json.NewDecoder(r.Body).Decode(del); err != nil {
+		log.Error(err)
+		if err0 := write400Error(w, err.Error()); err0 != nil {
+			log.Error(err0)
+		}
+		return
+	}
+
+	if err := deleteDownsampler(del); err != nil {
 		log.Error(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
 			log.Error(err0)

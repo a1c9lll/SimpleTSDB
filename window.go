@@ -49,12 +49,12 @@ func window(startTime, endTime int64, options map[string]interface{}, points []*
 		newPoints := []*point{}
 		windowDur := window.Nanoseconds()
 		currentPoint := 0
-		startWindowTime, endWindowTime := startTime-startTime%windowDur, endTime-endTime%window.Nanoseconds()
+		startWindowTime, endWindowTime := startTime-startTime%windowDur, endTime-endTime%windowDur
 		for windowTime := startWindowTime; windowTime <= endWindowTime; windowTime += windowDur {
 			found := false
 			for ; currentPoint < len(points); currentPoint++ {
 				pt := points[currentPoint]
-				if pt.Timestamp >= windowTime && pt.Timestamp < windowTime+window.Nanoseconds() {
+				if pt.Timestamp >= windowTime && pt.Timestamp < windowTime+windowDur {
 					pt.Window = windowTime
 					newPoints = append(newPoints, pt)
 					found = true
@@ -77,12 +77,12 @@ func window(startTime, endTime int64, options map[string]interface{}, points []*
 	// We're not filling gaps
 	windowDur := window.Nanoseconds()
 	currentPoint := 0
-	startWindowTime, endWindowTime := startTime-startTime%windowDur, endTime-endTime%window.Nanoseconds()
+	startWindowTime, endWindowTime := startTime-startTime%windowDur, endTime-endTime%windowDur
 
 	for windowTime := startWindowTime; windowTime <= endWindowTime; windowTime += windowDur {
 		for ; currentPoint < len(points); currentPoint++ {
 			pt := points[currentPoint]
-			if pt.Timestamp >= windowTime && pt.Timestamp < windowTime+window.Nanoseconds() {
+			if pt.Timestamp >= windowTime && pt.Timestamp < windowTime+windowDur {
 				pt.Window = windowTime
 			} else {
 				break

@@ -32,6 +32,64 @@ func TestMain(t *testing.T) {
 	}
 }
 
+func TestDownsample(t *testing.T) {
+	// insert some points
+	baseTime := mustParseTime("2000-01-01T00:00:00Z").Add(-time.Hour)
+	ipts := []*insertPointQuery{}
+	for i := 0; i < 60; i++ {
+		ipts = append(ipts, &insertPointQuery{
+			Metric: "test09z",
+			Tags: map[string]string{
+				"id": "2",
+			},
+			Point: &point{
+				Value:     float64(i),
+				Timestamp: baseTime.Add(time.Duration(i) * time.Minute).UnixNano(),
+			},
+		})
+	}
+
+	if err := insertPoints(ipts); err != nil {
+		t.Fatal(err)
+	}
+
+	/*
+			ID                    int64            `json:"id"`
+		Metric                string           `json:"metric"`
+		OutMetric             string           `json:"outMetric"`
+		RunEvery              string           `json:"runEvery"`
+		RunEveryDur           time.Duration    `json:"-"`
+		Query                 *downsampleQuery `json:"query"`
+		LastDownsampledWindow int64            `json:"-"`
+	*/
+	/*
+			type downsampleQuery struct {
+			Aggregators []*aggregatorQuery     `json:"aggregators"`
+			Window      map[string]interface{} `json:"window"`
+			Tags        map[string]string      `json:"tags"`
+		}
+	*/
+	if err := downsample(&downsampler{
+		Metric:      "test09z",
+		OutMetric:   "test09z_15m",
+		RunEvery:    "15m",
+		RunEveryDur: time.Minute * 15,
+		Query: &downsampleQuery{
+			Tags: map[string]string{
+				"id": "2",
+			},
+			Window: map[string]interface{}{
+				"every": "15m",
+			},
+			Aggregators: []*aggregatorQuery{
+				{Name: "mean"},
+			},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestInvalidMetricNameIninsertPoint(t *testing.T) {
 	if err := insertPoints([]*insertPointQuery{
 		{Metric: " a b"},

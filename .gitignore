@@ -1,3 +1,6 @@
 simpletsdb
 simpletsdb.exe
 config/simpletsdb-dev.conf
+test_downsampler.json
+add-downsampler0
+add-downsampler0.exe

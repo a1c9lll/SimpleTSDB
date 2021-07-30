@@ -1,5 +1,7 @@
 package main
 
+import "time"
+
 type point struct {
 	Value     float64 `json:"value"`
 	Timestamp int64   `json:"timestamp"`
@@ -37,4 +39,24 @@ type pointsQuery struct {
 
 type serverError struct {
 	Error string `json:"error"`
+}
+
+type downsampleQuery struct {
+	Aggregators []*aggregatorQuery     `json:"aggregators"`
+	Window      map[string]interface{} `json:"window"`
+	Tags        map[string]string      `json:"tags"`
+}
+
+type downsampler struct {
+	ID                    int64            `json:"id"`
+	Metric                string           `json:"metric"`
+	OutMetric             string           `json:"outMetric"`
+	RunEvery              string           `json:"runEvery"`
+	RunEveryDur           time.Duration    `json:"-"`
+	Query                 *downsampleQuery `json:"query"`
+	LastDownsampledWindow int64            `json:"-"`
+}
+
+type deleteDownsamplerRequest struct {
+	ID int64 `json:"id"`
 }
