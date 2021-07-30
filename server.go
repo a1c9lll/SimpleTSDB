@@ -243,7 +243,9 @@ func addDownsamplerHandler(w http.ResponseWriter, r *http.Request, _ httprouter.
 
 	defer r.Body.Close()
 
-	req := &downsampler{}
+	req := &downsampler{
+		Deleted: &AtomicBool{},
+	}
 
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		log.Error(err)

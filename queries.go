@@ -114,7 +114,9 @@ func selectDownsamplers() ([]*downsampler, error) {
 		lastDownsampledWindow interface{}
 	)
 	for scanner.Next() {
-		ds := &downsampler{}
+		ds := &downsampler{
+			Deleted: &AtomicBool{},
+		}
 		err := scanner.Scan(
 			&ds.ID,
 			&ds.Metric,
@@ -534,7 +536,7 @@ func deleteDownsampler(ds *deleteDownsamplerRequest) error {
 
 	for i, d := range downsamplers {
 		if d.ID == ds.ID {
-			d.Deleted = true
+			d.Deleted.Set(true)
 			downsamplers = append(downsamplers[:i], downsamplers[i+1:]...)
 			break
 		}

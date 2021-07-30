@@ -55,7 +55,7 @@ type downsampler struct {
 	RunEveryDur           time.Duration    `json:"-"`
 	Query                 *downsampleQuery `json:"query"`
 	LastDownsampledWindow int64            `json:"-"`
-	Deleted               bool             `json:"-"`
+	Deleted               *AtomicBool      `json:"-"`
 }
 
 type deleteDownsamplerRequest struct {

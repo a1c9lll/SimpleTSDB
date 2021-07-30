@@ -93,7 +93,7 @@ CREATE TABLE %s (
 
 func waitDownsample(d *downsampler) {
 	for {
-		if d.Deleted {
+		if d.Deleted.Get() {
 			return
 		}
 		t0 := time.Now()
