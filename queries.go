@@ -16,24 +16,26 @@ import (
 )
 
 var (
-	tagsIndexMap                      = map[string]bool{}
-	tagsIndexMapMutex                 = &sync.Mutex{}
-	createIndexMutex                  = &sync.Mutex{}
-	metricAndTagsRe                   = regexp.MustCompile(`^[a-zA-Z0-9_\-.]+$`)
-	insertBatchSize                   = 200
-	errUnsupportedMetricName          = errors.New("valid characters for metrics are [a-zA-Z0-9\\-._]")
-	errUnsupportedOutMetricName       = errors.New("valid characters for out metrics are [a-zA-Z0-9\\-._]")
-	errUnsupportedTagName             = errors.New("valid characters for tag names are [a-zA-Z0-9\\-._]")
-	errUnsupportedTagValue            = errors.New("valid characters for tag values are [a-zA-Z0-9\\-._]")
-	errMetricRequired                 = errors.New("metric is required")
-	errMetricDoesNotExist             = errors.New("metric does not exist")
-	errStartRequired                  = errors.New("query start is required")
-	errEndRequired                    = errors.New("query end is required")
-	errPointRequiredForInsertQuery    = errors.New("point required for insert query")
-	errWindowRequiredForDownsampler   = errors.New("window required for downsampler")
-	errRunEveryRequiredForDownsampler = errors.New("run every required for downsampler")
-	errOutMetricRequired              = errors.New("out metric required")
-	errQueryRequiredForDownsampler    = errors.New("query required for downsampler")
+	tagsIndexMap                           = map[string]bool{}
+	tagsIndexMapMutex                      = &sync.Mutex{}
+	createIndexMutex                       = &sync.Mutex{}
+	metricAndTagsRe                        = regexp.MustCompile(`^[a-zA-Z0-9_\-.]+$`)
+	insertBatchSize                        = 200
+	errUnsupportedMetricName               = errors.New("valid characters for metrics are [a-zA-Z0-9\\-._]")
+	errUnsupportedOutMetricName            = errors.New("valid characters for out metrics are [a-zA-Z0-9\\-._]")
+	errUnsupportedTagName                  = errors.New("valid characters for tag names are [a-zA-Z0-9\\-._]")
+	errUnsupportedTagValue                 = errors.New("valid characters for tag values are [a-zA-Z0-9\\-._]")
+	errMetricRequired                      = errors.New("metric is required")
+	errMetricDoesNotExist                  = errors.New("metric does not exist")
+	errStartRequired                       = errors.New("query start is required")
+	errEndRequired                         = errors.New("query end is required")
+	errPointRequiredForInsertQuery         = errors.New("point required for insert query")
+	errWindowRequiredForDownsampler        = errors.New("window required for downsampler")
+	errRunEveryRequiredForDownsampler      = errors.New("run every required for downsampler")
+	errOutMetricRequired                   = errors.New("out metric required")
+	errQueryRequiredForDownsampler         = errors.New("query required for downsampler")
+	errAggregatorsRequiredForDownsampler   = errors.New("aggregators option required for downsampler")
+	errOneAggregatorRequiredForDownsampler = errors.New("at least one aggregator must be used in downsampler spec")
 )
 
 func databaseExists(name string) (bool, error) {
@@ -480,6 +482,12 @@ func addDownsampler(ds *downsampler) error {
 	}
 	if ds.RunEvery == "" {
 		return errRunEveryRequiredForDownsampler
+	}
+	if ds.Query.Aggregators == nil {
+		return errAggregatorsRequiredForDownsampler
+	}
+	if len(ds.Query.Aggregators) == 0 {
+		return errOneAggregatorRequiredForDownsampler
 	}
 	query := fmt.Sprintf("INSERT INTO %s (metric,out_metric,run_every,query) VALUES ($1,$2,$3,$4) RETURNING id", downsamplersTable)
 	vals := []interface{}{
