@@ -218,8 +218,8 @@ func TestDownsamplerAPI(t *testing.T) {
 		t.Fatal()
 	}
 
-	downsamplers := []*downsampler{}
-	if err = json.NewDecoder(resp.Body).Decode(&downsamplers); err != nil {
+	downsamplers0 := []*downsampler{}
+	if err = json.NewDecoder(resp.Body).Decode(&downsamplers0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -228,7 +228,7 @@ func TestDownsamplerAPI(t *testing.T) {
 	}
 
 	// test delete
-	for _, d := range downsamplers {
+	for _, d := range downsamplers0 {
 		buf := &bytes.Buffer{}
 		if err := json.NewEncoder(buf).Encode(&deleteDownsamplerRequest{
 			ID: d.ID,
@@ -257,5 +257,10 @@ func TestDownsamplerAPI(t *testing.T) {
 
 	if len(ds0) != 0 {
 		t.Fatalf("expected 0 downsamplers, got %d", len(ds0))
+	}
+
+	if len(downsamplers) != 0 {
+		fmt.Println(downsamplers[0].ID)
+		t.Fatalf("expected 0 downsamplers in slice, got %d - %d", len(downsamplers), downsamplers[0].ID)
 	}
 }

@@ -81,9 +81,9 @@ None
 
 ###### Options:
 
-|Option           |Type     |Description                                                     |
-|:--------------- |:------- |:-------------------------------------------------------------- |
-|`countNullPoints`|`boolean`|Whether to count null points inserted by the windowing function.|
+|Option           |Type     |Description                                                                 |
+|:--------------- |:------- |:-------------------------------------------------------------------------- |
+|`countNullPoints`|`boolean`|_optional:_ Whether to count null points inserted by the windowing function.|
 
 #### First
 

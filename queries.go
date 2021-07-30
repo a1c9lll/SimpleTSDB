@@ -108,7 +108,7 @@ func selectDownsamplers() ([]*downsampler, error) {
 	}
 	defer scanner.Close()
 	var (
-		downsamplers          []*downsampler
+		downsamplers0         []*downsampler
 		queryJSON             string
 		runEvery              int64
 		lastDownsampledWindow interface{}
@@ -146,9 +146,9 @@ func selectDownsamplers() ([]*downsampler, error) {
 		if err != nil {
 			return nil, err
 		}
-		downsamplers = append(downsamplers, ds)
+		downsamplers0 = append(downsamplers0, ds)
 	}
-	return downsamplers, nil
+	return downsamplers0, nil
 }
 
 func createIndex(tags []string) error {
@@ -515,6 +515,8 @@ func addDownsampler(ds *downsampler) error {
 		return err
 	}
 
+	downsamplers = append(downsamplers, ds)
+
 	go waitDownsample(ds)
 
 	return nil
@@ -528,6 +530,14 @@ func deleteDownsampler(ds *deleteDownsamplerRequest) error {
 	_, err := session.Exec(query, vals...)
 	if err != nil {
 		return err
+	}
+
+	for i, d := range downsamplers {
+		if d.ID == ds.ID {
+			d.Deleted = true
+			downsamplers = append(downsamplers[:i], downsamplers[i+1:]...)
+			break
+		}
 	}
 
 	return nil

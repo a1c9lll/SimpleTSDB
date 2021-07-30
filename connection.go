@@ -93,6 +93,9 @@ CREATE TABLE %s (
 
 func waitDownsample(d *downsampler) {
 	for {
+		if d.Deleted {
+			return
+		}
 		t0 := time.Now()
 		err := downsample(d)
 		if err != nil {
