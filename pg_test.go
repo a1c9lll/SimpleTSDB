@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"strconv"
 	"testing"
 	"time"
@@ -26,7 +27,10 @@ func TestMain(t *testing.T) {
 	}
 	initDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], port, cfg["postgres_db"]+"_test", cfg["postgres_ssl_mode"])
 
-	_, err = session.Exec("DELETE FROM simpletsdb_metrics WHERE true")
+	err = db.Query(0, func(db *sql.DB) error {
+		_, err = db.Exec("DELETE FROM simpletsdb_metrics WHERE true")
+		return err
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,6 +107,7 @@ func TestMetricRequired(t *testing.T) {
 }
 
 func TestInsertPointAndQuery(t *testing.T) {
+	baseTime := time.Now().Add(-time.Second)
 	pts := []*insertPointQuery{
 		{
 			Metric: "test0",
@@ -112,7 +117,7 @@ func TestInsertPointAndQuery(t *testing.T) {
 			},
 			Point: &point{
 				Value:     183001000,
-				Timestamp: time.Now().UnixNano(),
+				Timestamp: baseTime.UnixNano(),
 			},
 		},
 		{
@@ -123,7 +128,7 @@ func TestInsertPointAndQuery(t *testing.T) {
 			},
 			Point: &point{
 				Value:     182599002,
-				Timestamp: time.Now().UnixNano(),
+				Timestamp: baseTime.Add(time.Millisecond).Local().UnixNano(),
 			},
 		},
 		{
@@ -134,7 +139,7 @@ func TestInsertPointAndQuery(t *testing.T) {
 			},
 			Point: &point{
 				Value:     183001199,
-				Timestamp: time.Now().UnixNano(),
+				Timestamp: baseTime.Add(time.Millisecond * 2).Local().UnixNano(),
 			},
 		},
 	}

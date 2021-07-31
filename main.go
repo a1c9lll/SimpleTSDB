@@ -9,6 +9,7 @@ import (
 )
 
 func main() {
+	log.SetLevel(log.InfoLevel)
 	configLocation := flag.String("config", "./config/simpletsdb.conf", "path to the configuration file")
 	flag.Parse()
 

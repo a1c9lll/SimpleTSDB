@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -22,6 +24,7 @@ func parseLine(line []byte) (*insertPointQuery, error) {
 	match := strs[0]
 
 	if len(match) != 7 {
+		log.Info(string(line))
 		return nil, errInvalidSyntax
 	}
 

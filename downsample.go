@@ -5,25 +5,29 @@ func downsample(ds *downsampler) error {
 		startTime             int64
 		endTime               int64
 		err                   error
-		firstValueUpdate      bool
 		checkFirstValueUpdate bool
 	)
 	if ds.LastDownsampledWindow == 0 {
-
 		startTime, err = selectFirstTimestamp(ds.Metric, ds.Query.Tags)
-		if err != nil {
+		if err != nil && err.Error() == "sql: no rows in result set" {
+			return nil
+		} else if err != nil {
 			return err
 		}
 
 		endTime, err = selectLastTimestamp(ds.Metric, ds.Query.Tags)
-		if err != nil {
+		if err != nil && err.Error() == "sql: no rows in result set" {
+			return nil
+		} else if err != nil {
 			return err
 		}
 	} else {
 		checkFirstValueUpdate = true
 		startTime = ds.LastDownsampledWindow
 		endTime, err = selectLastTimestamp(ds.Metric, ds.Query.Tags)
-		if err != nil {
+		if err != nil && err.Error() == "sql: no rows in result set" {
+			return nil
+		} else if err != nil {
 			return err
 		}
 	}
@@ -40,24 +44,19 @@ func downsample(ds *downsampler) error {
 	}
 
 	if len(pts) > 0 {
-		var i int
 		if checkFirstValueUpdate && pts[0].Timestamp == ds.LastDownsampledWindow {
 			err := updateFirstPointDownsample(ds.OutMetric, ds.Query.Tags, pts[0])
 			if err != nil {
 				return err
 			}
-			firstValueUpdate = true
-			i++
+			pts = pts[1:]
 		}
-		if len(pts) > 1 {
-			ipts := make([]*insertPointQuery, len(pts)-i)
-			for ; i < len(pts); i++ {
+		if len(pts) > 0 {
+			ipts := make([]*insertPointQuery, len(pts))
+			for i := 0; i < len(pts); i++ {
 				pt := pts[i]
-				idx := i
-				if firstValueUpdate {
-					idx--
-				}
-				ipts[idx] = &insertPointQuery{
+
+				ipts[i] = &insertPointQuery{
 					Metric: ds.OutMetric,
 					Tags:   ds.Query.Tags,
 					Point:  pt,
@@ -66,12 +65,13 @@ func downsample(ds *downsampler) error {
 			if err := insertPoints(ipts); err != nil {
 				return err
 			}
+
+			lastTimestamp := pts[len(pts)-1].Timestamp
+			if err := updateLastDownsampledWindow(ds.ID, lastTimestamp); err != nil {
+				return err
+			}
+			ds.LastDownsampledWindow = lastTimestamp
 		}
-		lastTimestamp := pts[len(pts)-1].Timestamp
-		if err := updateLastDownsampledWindow(ds.ID, lastTimestamp); err != nil {
-			return err
-		}
-		ds.LastDownsampledWindow = lastTimestamp
 	}
 
 	return nil

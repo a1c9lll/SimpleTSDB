@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,8 @@ import (
 )
 
 var (
+	priorityCRUD                           = 999
+	priorityDownsamplers                   = 0
 	tagsIndexMap                           = map[string]bool{}
 	createIndexMutex                       = &sync.Mutex{}
 	metricAndTagsRe                        = regexp.MustCompile(`^[a-zA-Z0-9_\-.]+$`)
@@ -37,11 +40,10 @@ var (
 	errOneAggregatorRequiredForDownsampler = errors.New("at least one aggregator must be used in downsampler spec")
 )
 
-func databaseExists(name string) (bool, error) {
+func databaseExists(name string, session *sql.DB) (bool, error) {
 	var (
 		name0 string
 		found bool
-		err   error
 	)
 	scanner, err := session.Query(fmt.Sprintf("SELECT datname FROM pg_database WHERE datname='%s';", name))
 	if err != nil {
@@ -61,95 +63,107 @@ func databaseExists(name string) (bool, error) {
 		}
 	}
 
+	scanner.Close()
+
 	if err := scanner.Err(); err != nil {
 		return false, err
 	}
 
-	return found, nil
+	return found, err
 }
 
 func tableExists(name string) (bool, error) {
 	var (
 		name0 string
 		found bool
-		err   error
 	)
-	scanner, err := session.Query(fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND table_name='%s';", name))
-	if err != nil {
-		return false, err
-	}
-
-	defer scanner.Close()
-
-	for scanner.Next() {
-		err = scanner.Scan(&name0)
+	err := db.Query(priorityCRUD, func(session *sql.DB) error {
+		scanner, err := session.Query(fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND table_name='%s';", name))
 		if err != nil {
-			scanner.Close()
-			return false, err
+			return err
 		}
-		if name0 == name {
-			found = true
+
+		defer scanner.Close()
+
+		for scanner.Next() {
+			err = scanner.Scan(&name0)
+			if err != nil {
+				scanner.Close()
+				return err
+			}
+			if name0 == name {
+				found = true
+			}
 		}
-	}
 
-	if err := scanner.Err(); err != nil {
-		return false, err
-	}
+		scanner.Close()
 
-	return found, nil
+		if err := scanner.Err(); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return found, err
 }
 
 func selectDownsamplers() ([]*downsampler, error) {
-	query := fmt.Sprintf("SELECT id,metric,out_metric,run_every,last_downsampled_window,query FROM %s", downsamplersTable)
-	scanner, err := session.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer scanner.Close()
 	var (
-		downsamplers0         []*downsampler
-		queryJSON             string
-		runEvery              int64
-		lastDownsampledWindow interface{}
+		downsamplers0 []*downsampler
 	)
-	for scanner.Next() {
-		ds := &downsampler{
-			Deleted: &AtomicBool{},
+	err := db.Query(priorityCRUD, func(session *sql.DB) error {
+		query := fmt.Sprintf("SELECT id,metric,out_metric,run_every,last_downsampled_window,query FROM %s", downsamplersTable)
+		scanner, err := session.Query(query)
+		if err != nil {
+			return err
 		}
-		err := scanner.Scan(
-			&ds.ID,
-			&ds.Metric,
-			&ds.OutMetric,
-			&runEvery,
-			&lastDownsampledWindow,
-			&queryJSON,
+		defer scanner.Close()
+		var (
+			queryJSON             string
+			runEvery              int64
+			lastDownsampledWindow interface{}
 		)
-		if err != nil {
-			return nil, err
-		}
-		if lastDownsampledWindow != nil {
-			switch v := lastDownsampledWindow.(type) {
-			case int:
-				ds.LastDownsampledWindow = int64(v)
-			case int32:
-				ds.LastDownsampledWindow = int64(v)
-			case int64:
-				ds.LastDownsampledWindow = v
-			default:
-				return nil, errors.New("incorrect type for lastDownsampledWindow")
+		for scanner.Next() {
+			ds := &downsampler{
+				Deleted: &AtomicBool{},
 			}
-		}
-		ds.RunEvery = time.Duration(runEvery).String()
-		ds.RunEveryDur = time.Duration(runEvery)
+			err := scanner.Scan(
+				&ds.ID,
+				&ds.Metric,
+				&ds.OutMetric,
+				&runEvery,
+				&lastDownsampledWindow,
+				&queryJSON,
+			)
+			if err != nil {
+				return err
+			}
+			if lastDownsampledWindow != nil {
+				switch v := lastDownsampledWindow.(type) {
+				case int:
+					ds.LastDownsampledWindow = int64(v)
+				case int32:
+					ds.LastDownsampledWindow = int64(v)
+				case int64:
+					ds.LastDownsampledWindow = v
+				default:
+					return errors.New("incorrect type for lastDownsampledWindow")
+				}
+			}
+			ds.RunEvery = time.Duration(runEvery).String()
+			ds.RunEveryDur = time.Duration(runEvery)
 
-		ds.Query = &downsampleQuery{}
-		err = json.Unmarshal([]byte(queryJSON), &ds.Query)
-		if err != nil {
-			return nil, err
+			ds.Query = &downsampleQuery{}
+			err = json.Unmarshal([]byte(queryJSON), &ds.Query)
+			if err != nil {
+				return err
+			}
+			downsamplers0 = append(downsamplers0, ds)
 		}
-		downsamplers0 = append(downsamplers0, ds)
-	}
-	return downsamplers0, nil
+		return nil
+	})
+	return downsamplers0, err
 }
 
 func generateTagsIndexString(ss []string) string {
@@ -187,15 +201,22 @@ func createIndex(tags []string) {
 	indexNameStr.WriteString("timestamp")
 	indexSchemaStr.WriteString("timestamp")
 
-	t0 := time.Now()
-	query := fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_%s ON %s(%s)", metricsTable, indexNameStr.String(), metricsTable, indexSchemaStr.String())
-	_, err := session.Exec(query)
+	err := db.Query(priorityCRUD, func(session *sql.DB) error {
+		t0 := time.Now()
+		query := fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_%s ON %s(%s)", metricsTable, indexNameStr.String(), metricsTable, indexSchemaStr.String())
+		_, err := session.Exec(query)
+		if err != nil {
+			return err
+		} else {
+			tagsIndexMap[s] = true
+		}
+		log.Infof("create index if not exists %v took %s", indexNameStr.String(), time.Since(t0))
+		return nil
+	})
+
 	if err != nil {
 		log.Error(err)
-	} else {
-		tagsIndexMap[s] = true
 	}
-	log.Infof("create index if not exists %v took %s", indexNameStr.String(), time.Since(t0))
 }
 
 func uniqueTags(haystack [][]string, needle []string) bool {
@@ -276,8 +297,14 @@ func insertPoints(queries0 []*insertPointQuery) error {
 			}
 			go createIndex(s)
 		}
-		queryStr := fmt.Sprintf(`INSERT INTO %s (metric,timestamp,value,tags) VALUES %s ON CONFLICT DO NOTHING`, metricsTable, valuesStr)
-		if _, err := session.Exec(queryStr, values...); err != nil { //&& err.Error() != fmt.Sprintf(errStringDuplicate, strings.ToLower(firstMetric)) {
+		err = db.Query(priorityCRUD, func(session *sql.DB) error {
+			queryStr := fmt.Sprintf(`INSERT INTO %s (metric,timestamp,value,tags) VALUES %s ON CONFLICT DO NOTHING` /* */, metricsTable, valuesStr)
+			if _, err := session.Exec(queryStr, values...); err != nil { //&& err.Error() != fmt.Sprintf(errStringDuplicate, strings.ToLower(firstMetric)) {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
 			return err
 		}
 	}
@@ -349,48 +376,58 @@ func queryPoints(query *pointsQuery) ([]*point, error) {
 		}
 	}
 
-	queryStr := fmt.Sprintf(`SELECT timestamp, value FROM %s WHERE metric = $1 AND timestamp >= $2 AND timestamp <= $3%s ORDER BY timestamp ASC%s`, metricsTable, tagStr, limitStr)
-
-	scanner, err := session.Query(queryStr, queryVals...)
-	if err != nil {
-		return nil, err
-	}
-
 	var (
-		val    interface{}
 		points []*point
 	)
-	for scanner.Next() {
-		pt := &point{}
-		err := scanner.Scan(&pt.Timestamp, &val)
+
+	err = db.Query(priorityCRUD, func(session *sql.DB) error {
+		queryStr := fmt.Sprintf(`SELECT timestamp, value FROM %s WHERE metric = $1 AND timestamp >= $2 AND timestamp <= $3%s ORDER BY timestamp ASC%s`, metricsTable, tagStr, limitStr)
+
+		scanner, err := session.Query(queryStr, queryVals...)
 		if err != nil {
-			scanner.Close()
-			return nil, err
+			return err
 		}
-		if val == nil {
-			pt.Null = true
-		} else {
-			switch v := val.(type) {
-			case int:
-				pt.Value = float64(v)
-			case int32:
-				pt.Value = float64(v)
-			case int64:
-				pt.Value = float64(v)
-			case float32:
-				pt.Value = float64(v)
-			case float64:
-				pt.Value = v
-			default:
-				return nil, errors.New("incorrect type for lastDownsampledWindow")
+
+		var (
+			val interface{}
+		)
+		for scanner.Next() {
+			pt := &point{}
+			if err := scanner.Scan(&pt.Timestamp, &val); err != nil {
+				scanner.Close()
+				return err
 			}
+			if val == nil {
+				pt.Null = true
+			} else {
+				switch v := val.(type) {
+				case int:
+					pt.Value = float64(v)
+				case int32:
+					pt.Value = float64(v)
+				case int64:
+					pt.Value = float64(v)
+				case float32:
+					pt.Value = float64(v)
+				case float64:
+					pt.Value = v
+				default:
+					scanner.Close()
+					return errors.New("incorrect type for lastDownsampledWindow")
+				}
+			}
+			points = append(points, pt)
 		}
-		points = append(points, pt)
-	}
 
-	scanner.Close()
+		scanner.Close()
 
-	if err := scanner.Err(); err != nil {
+		if err := scanner.Err(); err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
 
@@ -462,10 +499,15 @@ func deletePoints(query *deletePointsQuery) error {
 			return err
 		}
 	}
+	err = db.Query(priorityCRUD, func(session *sql.DB) error {
+		queryStr := fmt.Sprintf(`DELETE FROM %s WHERE metric = $1 AND timestamp >= $2 AND timestamp <= $3%s`, metricsTable, tagStr)
 
-	queryStr := fmt.Sprintf(`DELETE FROM %s WHERE metric = $1 AND timestamp >= $2 AND timestamp <= $3%s`, metricsTable, tagStr)
-
-	if _, err := session.Exec(queryStr, queryVals...); err != nil {
+		if _, err := session.Exec(queryStr, queryVals...); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
 		return err
 	}
 	return nil
@@ -520,11 +562,17 @@ func addDownsampler(ds *downsampler) error {
 	}
 	vals = append(vals, buf.String())
 
-	row := session.QueryRow(query, vals...)
-	if row.Err() != nil {
-		return err
-	}
-	if err = row.Scan(&ds.ID); err != nil {
+	err = db.Query(priorityDownsamplers, func(session *sql.DB) error {
+		row := session.QueryRow(query, vals...)
+		if err := row.Scan(&ds.ID); err != nil {
+			return err
+		}
+		if err := row.Err(); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
 		return err
 	}
 
@@ -540,7 +588,13 @@ func deleteDownsampler(ds *deleteDownsamplerRequest) error {
 	vals := []interface{}{
 		ds.ID,
 	}
-	_, err := session.Exec(query, vals...)
+	err := db.Query(priorityDownsamplers, func(session *sql.DB) error {
+		_, err := session.Exec(query, vals...)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 	if err != nil {
 		return err
 	}
@@ -564,34 +618,22 @@ func selectLastTimestamp(metric string, tags map[string]string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	query := fmt.Sprintf("SELECT timestamp FROM %s WHERE metric = $1%s ORDER BY timestamp DESC LIMIT 1", metricsTable, tagsStr)
-	scanner, err := session.Query(query, vals...)
-	if err != nil {
-		return 0, err
-	}
 	var (
 		timestamp int64
-		n         int
 	)
-	for scanner.Next() {
-		n++
-		err := scanner.Scan(&timestamp)
-		if err != nil {
-			scanner.Close()
-			return 0, err
+	err = db.Query(priorityDownsamplers, func(session *sql.DB) error {
+		query := fmt.Sprintf("SELECT timestamp FROM %s WHERE metric = $1%s ORDER BY timestamp DESC LIMIT 1", metricsTable, tagsStr)
+		scanner := session.QueryRow(query, vals...)
+		if err := scanner.Scan(&timestamp); err != nil {
+			return err
 		}
-	}
-	if n == 0 {
-		return 0, errors.New("no points in table")
-	}
+		if err := scanner.Err(); err != nil {
+			return err
+		}
+		return nil
+	})
 
-	scanner.Close()
-
-	if err := scanner.Err(); err != nil {
-		return 0, err
-	}
-
-	return timestamp, nil
+	return timestamp, err
 }
 
 func selectFirstTimestamp(metric string, tags map[string]string) (int64, error) {
@@ -602,34 +644,23 @@ func selectFirstTimestamp(metric string, tags map[string]string) (int64, error) 
 	if err != nil {
 		return 0, err
 	}
-	query := fmt.Sprintf("SELECT timestamp FROM %s WHERE metric = $1%s ORDER BY timestamp ASC LIMIT 1", metricsTable, tagsStr)
-	scanner, err := session.Query(query, vals...)
-	if err != nil {
-		return 0, err
-	}
 	var (
 		timestamp int64
-		n         int
 	)
-	for scanner.Next() {
-		n++
-		err := scanner.Scan(&timestamp)
-		if err != nil {
-			scanner.Close()
-			return 0, err
+	err = db.Query(priorityDownsamplers, func(session *sql.DB) error {
+		query := fmt.Sprintf("SELECT timestamp FROM %s WHERE metric = $1%s ORDER BY timestamp ASC LIMIT 1", metricsTable, tagsStr)
+		scanner := session.QueryRow(query, vals...)
+
+		if err := scanner.Scan(&timestamp); err != nil {
+			return err
 		}
-	}
-	if n == 0 {
-		return 0, errors.New("no points in table")
-	}
+		if err := scanner.Err(); err != nil {
+			return err
+		}
+		return nil
+	})
 
-	scanner.Close()
-
-	if err := scanner.Err(); err != nil {
-		return 0, err
-	}
-
-	return timestamp, nil
+	return timestamp, err
 }
 
 func updateFirstPointDownsample(metric string, tags map[string]string, point *point) error {
@@ -642,8 +673,14 @@ func updateFirstPointDownsample(metric string, tags map[string]string, point *po
 	if err != nil {
 		return err
 	}
-	query := fmt.Sprintf("UPDATE %s SET value = $1 WHERE metric = $2 AND timestamp = $3%s", metricsTable, tagsStr)
-	if _, err := session.Exec(query, vals...); err != nil {
+	err = db.Query(priorityDownsamplers, func(session *sql.DB) error {
+		query := fmt.Sprintf("UPDATE %s SET value = $1 WHERE metric = $2 AND timestamp = $3%s", metricsTable, tagsStr)
+		if _, err := session.Exec(query, vals...); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
 		return err
 	}
 
@@ -651,11 +688,18 @@ func updateFirstPointDownsample(metric string, tags map[string]string, point *po
 }
 
 func updateLastDownsampledWindow(id int64, lastTimestamp int64) error {
-	query := fmt.Sprintf("UPDATE %s SET last_downsampled_window = $1 WHERE id = $2", downsamplersTable)
-	if _, err := session.Exec(query, []interface{}{
+	vals := []interface{}{
 		lastTimestamp,
 		id,
-	}...); err != nil {
+	}
+	err := db.Query(priorityDownsamplers, func(session *sql.DB) error {
+		query := fmt.Sprintf("UPDATE %s SET last_downsampled_window = $1 WHERE id = $2", downsamplersTable)
+		if _, err := session.Exec(query, vals...); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
 		return err
 	}
 	return nil

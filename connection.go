@@ -1,8 +1,10 @@
 package main
 
 import (
+	"container/heap"
 	"database/sql"
 	"fmt"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -11,7 +13,7 @@ import (
 )
 
 var (
-	session           *sql.DB
+	db                *DB
 	metricsTable      = `simpletsdb_metrics`
 	downsamplersTable = `simpletsdb_downsamplers`
 	downsamplers      []*downsampler
@@ -24,7 +26,7 @@ func initDB(pgUser, pgPassword, pgHost string, pgPort int, pgDB, pgSSLMode strin
 	}
 	connStr0 := fmt.Sprintf("user=%s %shost='%s' port=%d sslmode=%s", pgUser, passwordString, pgHost, pgPort, pgSSLMode)
 	var err error
-	session, err = sql.Open("postgres", connStr0)
+	session, err := sql.Open("postgres", connStr0)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -32,7 +34,7 @@ func initDB(pgUser, pgPassword, pgHost string, pgPort int, pgDB, pgSSLMode strin
 		log.Fatal(err)
 	}
 	session.Exec(fmt.Sprintf("create database %s", pgDB))
-	if ok, err := databaseExists(pgDB); err != nil {
+	if ok, err := databaseExists(pgDB, session); err != nil {
 		log.Fatal(err)
 	} else if !ok {
 		log.Fatalf("could not create database %s", pgDB)
@@ -54,20 +56,39 @@ CREATE TABLE %s (
 	value double precision,
 	timestamp bigint,
 	tags jsonb,
-	UNIQUE(metric, value, timestamp, tags)
+	UNIQUE(metric, timestamp, tags)
 )
 	`, metricsTable))
 
 	session.Exec(fmt.Sprintf(`
-	CREATE TABLE %s (
-		id serial,
-		metric text,
-		out_metric text,
-		run_every bigint,
-		last_downsampled_window bigint,
-		query jsonb
-	)
+CREATE TABLE %s (
+  id serial,
+  metric text,
+  out_metric text,
+  run_every bigint,
+  last_downsampled_window bigint,
+  query jsonb
+)
 		`, downsamplersTable))
+
+	db = &DB{queue: &PriorityQueue{}, cond: sync.NewCond(&sync.Mutex{})}
+	heap.Init(db.queue)
+
+	for i := 0; i < 500; i++ {
+		go func() {
+			for {
+				db.cond.L.Lock()
+				for db.queue.Len() == 0 {
+					db.cond.Wait()
+				}
+				item := heap.Pop(db.queue).(*Item)
+				db.cond.L.Unlock()
+
+				err := item.fn(session)
+				item.done <- err
+			}
+		}()
+	}
 
 	if ok, err := tableExists(metricsTable); err != nil {
 		log.Fatal(err)
@@ -80,6 +101,8 @@ CREATE TABLE %s (
 	} else if !ok {
 		log.Fatalf("could not create %s table", downsamplersTable)
 	}
+
+	log.Info("everything fine, going to downsamplers")
 
 	downsamplers, err = selectDownsamplers()
 	if err != nil {
@@ -100,9 +123,11 @@ func waitDownsample(d *downsampler) {
 		err := downsample(d)
 		if err != nil {
 			log.Error(err)
+			time.Sleep(1 * time.Minute)
+			continue
 		}
 		t1 := time.Since(t0)
-		log.Infof("downsample %d took %dms", d.ID, t1.Milliseconds())
+		log.Debugf("downsample %d took %dms", d.ID, t1.Milliseconds())
 		<-time.After(d.RunEveryDur)
 	}
 }
