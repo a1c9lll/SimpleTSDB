@@ -544,10 +544,11 @@ func addDownsampler(db *dbConn, ds *downsampler) error {
 	if len(ds.Query.Aggregators) == 0 {
 		return errOneAggregatorRequiredForDownsampler
 	}
-	query := fmt.Sprintf("INSERT INTO %s (metric,out_metric,run_every,query) VALUES ($1,$2,$3,$4) RETURNING id", downsamplersTable)
+	query := fmt.Sprintf("INSERT INTO %s (metric,out_metric,last_updated,run_every,query) VALUES ($1,$2,$3,$4,$5) RETURNING id", downsamplersTable)
 	vals := []interface{}{
 		ds.Metric,
 		ds.OutMetric,
+		0,
 	}
 	dur, err := time.ParseDuration(ds.RunEvery)
 	if err != nil {
@@ -575,10 +576,6 @@ func addDownsampler(db *dbConn, ds *downsampler) error {
 	if err != nil {
 		return err
 	}
-
-	downsamplers = append(downsamplers, ds)
-
-	go waitDownsample(db, ds)
 
 	return nil
 }

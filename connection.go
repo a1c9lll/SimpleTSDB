@@ -3,6 +3,8 @@ package main
 import (
 	"container/heap"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -13,9 +15,10 @@ import (
 )
 
 var (
-	metricsTable      = `simpletsdb_metrics`
-	downsamplersTable = `simpletsdb_downsamplers`
-	downsamplers      []*downsampler
+	metricsTable                 = `simpletsdb_metrics`
+	downsamplersTable            = `simpletsdb_downsamplers`
+	downsamplers                 []*downsampler
+	errLastDownsampledWindowType = errors.New("incorrect type for lastDownsampledWindow")
 )
 
 func initDB(pgUser, pgPassword, pgHost string, pgPort int, pgDB, pgSSLMode string, nWorkers int) *dbConn {
@@ -66,6 +69,7 @@ CREATE TABLE %s (
   out_metric text,
   run_every bigint,
   last_downsampled_window bigint,
+	last_updated bigint NOT NULL,
   query jsonb
 )
 		`, downsamplersTable))
@@ -101,32 +105,95 @@ CREATE TABLE %s (
 		log.Fatalf("could not create %s table", downsamplersTable)
 	}
 
-	downsamplers, err = selectDownsamplers(db)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for _, d := range downsamplers {
-		go waitDownsample(db, d)
-	}
+	go handleDownsamplers(db)
 
 	return db
 }
 
-func waitDownsample(db *dbConn, d *downsampler) {
+//select id, out_metric, last_updated, run_every,  (last_updated + run_every)::bigint - (extract(epoch from now())*1000000000)::bigint as time_until_update from simpletsdb_downsamplers;
+func handleDownsamplers(db *dbConn) {
 	for {
-		if d.Deleted.Get() {
-			return
+		var (
+			timeUntilUpdate int64
+			ds              = &downsampler{}
+		)
+		err := db.Query(priorityDownsamplers, func(db *sql.DB) error {
+			var (
+				queryJSON             string
+				runEvery              int64
+				lastDownsampledWindow interface{}
+			)
+			vals := []interface{}{
+				time.Now().UnixNano(),
+			}
+			row := db.QueryRow("select id,metric,out_metric,run_every,last_downsampled_window,query,(last_updated + run_every)::bigint - $1 as time_until_update from simpletsdb_downsamplers order by time_until_update asc limit 1", vals...)
+			err := row.Scan(
+				&ds.ID,
+				&ds.Metric,
+				&ds.OutMetric,
+				&runEvery,
+				&lastDownsampledWindow,
+				&queryJSON,
+				&timeUntilUpdate,
+			)
+			if err != nil {
+				return err
+			}
+			if lastDownsampledWindow != nil {
+				switch v := lastDownsampledWindow.(type) {
+				case int:
+					ds.LastDownsampledWindow = int64(v)
+				case int32:
+					ds.LastDownsampledWindow = int64(v)
+				case int64:
+					ds.LastDownsampledWindow = v
+				default:
+					return errLastDownsampledWindowType
+				}
+			}
+			ds.RunEvery = time.Duration(runEvery).String()
+			ds.RunEveryDur = time.Duration(runEvery)
+
+			ds.Query = &downsampleQuery{}
+			err = json.Unmarshal([]byte(queryJSON), &ds.Query)
+			if err != nil {
+				return err
+			}
+			if err := row.Err(); err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			if err.Error() == "sql: no rows in result set" {
+				time.Sleep(time.Second)
+				continue
+			}
+			panic(err)
+		}
+		if timeUntilUpdate > 0 {
+			log.Infof("waiting %s for downsampler %d", time.Duration(timeUntilUpdate), ds.ID)
+			time.Sleep(time.Duration(timeUntilUpdate))
 		}
 		t0 := time.Now()
-		err := downsample(db, d)
+		err = downsample(db, ds)
 		if err != nil {
-			log.Error(err)
-			time.Sleep(1 * time.Minute)
-			continue
+			panic(err)
+		}
+
+		err = db.Query(priorityDownsamplers, func(db *sql.DB) error {
+			query := fmt.Sprintf("UPDATE %s SET last_updated = $1 WHERE id = $2", downsamplersTable)
+			vals := []interface{}{
+				time.Now().UnixNano(),
+				ds.ID,
+			}
+			_, err := db.Exec(query, vals...)
+			return err
+		})
+		if err != nil {
+			panic(err)
 		}
 		t1 := time.Since(t0)
-		log.Debugf("downsample %d took %dms", d.ID, t1.Milliseconds())
-		<-time.After(d.RunEveryDur)
+		log.Debugf("downsample %d took %dms", ds.ID, t1.Milliseconds())
 	}
 }
