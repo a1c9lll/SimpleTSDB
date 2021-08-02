@@ -102,8 +102,6 @@ CREATE TABLE %s (
 		log.Fatalf("could not create %s table", downsamplersTable)
 	}
 
-	log.Info("everything fine, going to downsamplers")
-
 	downsamplers, err = selectDownsamplers()
 	if err != nil {
 		log.Fatal(err)

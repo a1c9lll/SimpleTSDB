@@ -52,15 +52,15 @@ func downsample(ds *downsampler) error {
 			pts = pts[1:]
 		}
 		if len(pts) > 0 {
-			ipts := make([]*insertPointQuery, len(pts))
+			ipts := []*insertPointQuery{}
 			for i := 0; i < len(pts); i++ {
 				pt := pts[i]
 
-				ipts[i] = &insertPointQuery{
+				ipts = append(ipts, &insertPointQuery{
 					Metric: ds.OutMetric,
 					Tags:   ds.Query.Tags,
 					Point:  pt,
-				}
+				})
 			}
 			if err := insertPoints(ipts); err != nil {
 				return err
