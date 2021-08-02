@@ -35,17 +35,24 @@ func main() {
 	if v, ok := cfg["postgres_db"]; v == "" || !ok {
 		log.Fatal("postgres_db config is required")
 	}
-
+	if v, ok := cfg["postgres_n_conn_workers"]; v == "" || !ok {
+		log.Fatal("postgres_n_conn_workers config is required")
+	}
 	var pgPassword string
 	if p, ok := cfg["postgres_password"]; ok {
 		pgPassword = p
+	}
+
+	nConnWorkers, err := strconv.Atoi(cfg["postgres_n_conn_workers"])
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	dbPort, err := strconv.Atoi(cfg["postgres_port"])
 	if err != nil {
 		log.Fatal(err)
 	}
-	initDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], dbPort, cfg["postgres_db"], cfg["postgres_ssl_mode"])
+	db := initDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], dbPort, cfg["postgres_db"], cfg["postgres_ssl_mode"], nConnWorkers)
 
 	log.Infof("Connected to database [%s] at %s:%d", cfg["postgres_db"], cfg["postgres_host"], dbPort)
 	// init server
@@ -55,24 +62,25 @@ func main() {
 	if v, ok := cfg["simpletsdb_bind_port"]; v == "" || !ok {
 		log.Fatal("simpletsdb_bind_port config is required")
 	}
-	if v, ok := cfg["simpletsdb_read_timeout"]; v == "" || !ok {
-		log.Fatal("simpletsdb_read_timeout config is required")
+	if v, ok := cfg["simpletsdb_http_read_timeout"]; v == "" || !ok {
+		log.Fatal("simpletsdb_http_read_timeout config is required")
 	}
-	if v, ok := cfg["simpletsdb_write_timeout"]; v == "" || !ok {
-		log.Fatal("simpletsdb_write_timeout config is required")
+	if v, ok := cfg["simpletsdb_http_write_timeout"]; v == "" || !ok {
+		log.Fatal("simpletsdb_http_write_timeout config is required")
 	}
 	if v, ok := cfg["simpletsdb_line_buffer_size"]; v == "" || !ok {
 		log.Fatal("simpletsdb_line_buffer_size config is required")
 	}
+
 	serverPort, err := strconv.Atoi(cfg["simpletsdb_bind_port"])
 	if err != nil {
 		log.Fatal(err)
 	}
-	serverReadTimeout, err := time.ParseDuration(cfg["simpletsdb_read_timeout"])
+	serverReadTimeout, err := time.ParseDuration(cfg["simpletsdb_http_read_timeout"])
 	if err != nil {
 		log.Fatal(err)
 	}
-	serverWriteTimeout, err := time.ParseDuration(cfg["simpletsdb_write_timeout"])
+	serverWriteTimeout, err := time.ParseDuration(cfg["simpletsdb_http_write_timeout"])
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -92,5 +100,5 @@ func main() {
 	}
 
 	log.Infof("Initializing server at %s:%d", cfg["simpletsdb_bind_host"], serverPort)
-	initServer(cfg["simpletsdb_bind_host"], serverPort, serverReadTimeout, serverWriteTimeout, readLineProtocolBufferSize)
+	initServer(db, cfg["simpletsdb_bind_host"], serverPort, serverReadTimeout, serverWriteTimeout, readLineProtocolBufferSize)
 }

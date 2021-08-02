@@ -16,7 +16,7 @@ func TestInsertPointsHandler(t *testing.T) {
 	// test invalid query
 	req := httptest.NewRequest("POST", "/insert_points", nil)
 	w := httptest.NewRecorder()
-	insertPointsHandler(w, req, nil)
+	insertPointsHandler(db0, w, req, nil)
 
 	resp := w.Result()
 
@@ -35,7 +35,7 @@ func TestInsertPointsHandler(t *testing.T) {
 
 	w = httptest.NewRecorder()
 
-	insertPointsHandler(w, req, nil)
+	insertPointsHandler(db0, w, req, nil)
 
 	resp = w.Result()
 
@@ -43,7 +43,7 @@ func TestInsertPointsHandler(t *testing.T) {
 		t.Fatal()
 	}
 
-	pts, err := queryPoints(&pointsQuery{
+	pts, err := queryPoints(db0, &pointsQuery{
 		Metric: "test7",
 		Start:  baseTime.UnixNano(),
 		Tags: map[string]string{
@@ -70,7 +70,7 @@ func TestQueryPointsHandler(t *testing.T) {
 		pt, _ := parseLine([]byte(fmt.Sprintf("test6,id=28084 type=high,%f %d\n", vals[i], baseTime.Add(time.Minute*time.Duration(i)).UnixNano())))
 		queries = append(queries, pt)
 	}
-	err := insertPoints(queries)
+	err := insertPoints(db0, queries)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestQueryPointsHandler(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	queryPointsHandler(w, req, nil)
+	queryPointsHandler(db0, w, req, nil)
 
 	resp := w.Result()
 
@@ -123,7 +123,7 @@ func TestDeletePointsHandler(t *testing.T) {
 		q, _ := parseLine([]byte(fmt.Sprintf("test10,id=28084,999 %d\n", baseTime.Add(time.Minute*time.Duration(i)).UnixNano())))
 		queries = append(queries, q)
 	}
-	if err := insertPoints(queries); err != nil {
+	if err := insertPoints(db0, queries); err != nil {
 		t.Fatal(err)
 	}
 	buf := &bytes.Buffer{}
@@ -142,7 +142,7 @@ func TestDeletePointsHandler(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	deletePointsHandler(w, req, nil)
+	deletePointsHandler(db0, w, req, nil)
 
 	resp := w.Result()
 
@@ -150,7 +150,7 @@ func TestDeletePointsHandler(t *testing.T) {
 		t.Fatal()
 	}
 
-	points, err := queryPoints(&pointsQuery{
+	points, err := queryPoints(db0, &pointsQuery{
 		Metric: "test10",
 		Start:  baseTime.UnixNano(),
 		End:    baseTime.Add(time.Minute * 4).UnixNano(),
@@ -193,7 +193,7 @@ func TestDownsamplerAPI(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	addDownsamplerHandler(w, req, nil)
+	addDownsamplerHandler(db0, w, req, nil)
 
 	resp := w.Result()
 
@@ -210,7 +210,7 @@ func TestDownsamplerAPI(t *testing.T) {
 
 	w = httptest.NewRecorder()
 
-	listDownsamplersHandler(w, req, nil)
+	listDownsamplersHandler(db0, w, req, nil)
 
 	resp = w.Result()
 
@@ -240,7 +240,7 @@ func TestDownsamplerAPI(t *testing.T) {
 
 		w := httptest.NewRecorder()
 
-		deleteDownsamplerHandler(w, req, nil)
+		deleteDownsamplerHandler(db0, w, req, nil)
 
 		resp := w.Result()
 
@@ -250,7 +250,7 @@ func TestDownsamplerAPI(t *testing.T) {
 		}
 	}
 
-	ds0, err := selectDownsamplers()
+	ds0, err := selectDownsamplers(db0)
 	if err != nil {
 		t.Fatal(err)
 	}

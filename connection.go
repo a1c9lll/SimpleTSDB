@@ -13,13 +13,12 @@ import (
 )
 
 var (
-	db                *DB
 	metricsTable      = `simpletsdb_metrics`
 	downsamplersTable = `simpletsdb_downsamplers`
 	downsamplers      []*downsampler
 )
 
-func initDB(pgUser, pgPassword, pgHost string, pgPort int, pgDB, pgSSLMode string) {
+func initDB(pgUser, pgPassword, pgHost string, pgPort int, pgDB, pgSSLMode string, nWorkers int) *dbConn {
 	var passwordString string
 	if pgPassword != "" {
 		passwordString = fmt.Sprintf("password='%s' ", pgPassword)
@@ -71,17 +70,17 @@ CREATE TABLE %s (
 )
 		`, downsamplersTable))
 
-	db = &DB{queue: &PriorityQueue{}, cond: sync.NewCond(&sync.Mutex{})}
+	db := &dbConn{queue: &priorityQueue{}, cond: sync.NewCond(&sync.Mutex{})}
 	heap.Init(db.queue)
 
-	for i := 0; i < 500; i++ {
+	for i := 0; i < nWorkers; i++ {
 		go func() {
 			for {
 				db.cond.L.Lock()
 				for db.queue.Len() == 0 {
 					db.cond.Wait()
 				}
-				item := heap.Pop(db.queue).(*Item)
+				item := heap.Pop(db.queue).(*item)
 				db.cond.L.Unlock()
 
 				err := item.fn(session)
@@ -90,35 +89,37 @@ CREATE TABLE %s (
 		}()
 	}
 
-	if ok, err := tableExists(metricsTable); err != nil {
+	if ok, err := tableExists(db, metricsTable); err != nil {
 		log.Fatal(err)
 	} else if !ok {
 		log.Fatalf("could not create %s table", metricsTable)
 	}
 
-	if ok, err := tableExists(downsamplersTable); err != nil {
+	if ok, err := tableExists(db, downsamplersTable); err != nil {
 		log.Fatal(err)
 	} else if !ok {
 		log.Fatalf("could not create %s table", downsamplersTable)
 	}
 
-	downsamplers, err = selectDownsamplers()
+	downsamplers, err = selectDownsamplers(db)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	for _, d := range downsamplers {
-		go waitDownsample(d)
+		go waitDownsample(db, d)
 	}
+
+	return db
 }
 
-func waitDownsample(d *downsampler) {
+func waitDownsample(db *dbConn, d *downsampler) {
 	for {
 		if d.Deleted.Get() {
 			return
 		}
 		t0 := time.Now()
-		err := downsample(d)
+		err := downsample(db, d)
 		if err != nil {
 			log.Error(err)
 			time.Sleep(1 * time.Minute)

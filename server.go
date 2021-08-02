@@ -16,14 +16,14 @@ var (
 	readLineProtocolBufferSize = 65536
 )
 
-func initServer(tsdbHost string, tsdbPort int, tsdbReadTimeout, tsdbWriteTimeout time.Duration, readLineProtocolBufferSizeP int) {
+func initServer(db *dbConn, tsdbHost string, tsdbPort int, tsdbReadTimeout, tsdbWriteTimeout time.Duration, readLineProtocolBufferSizeP int) {
 	router := httprouter.New()
-	router.POST("/insert_points", insertPointsHandler)
-	router.POST("/query_points", queryPointsHandler)
-	router.DELETE("/delete_points", deletePointsHandler)
-	router.POST("/add_downsampler", addDownsamplerHandler)
-	router.GET("/list_downsamplers", listDownsamplersHandler)
-	router.DELETE("/delete_downsampler", deleteDownsamplerHandler)
+	router.POST("/insert_points", withDB(db, insertPointsHandler))
+	router.POST("/query_points", withDB(db, queryPointsHandler))
+	router.DELETE("/delete_points", withDB(db, deletePointsHandler))
+	router.POST("/add_downsampler", withDB(db, addDownsamplerHandler))
+	router.GET("/list_downsamplers", withDB(db, listDownsamplersHandler))
+	router.DELETE("/delete_downsampler", withDB(db, deleteDownsamplerHandler))
 
 	s := &http.Server{
 		Addr:           fmt.Sprintf("%s:%d", tsdbHost, tsdbPort),
@@ -36,6 +36,12 @@ func initServer(tsdbHost string, tsdbPort int, tsdbReadTimeout, tsdbWriteTimeout
 	readLineProtocolBufferSize = readLineProtocolBufferSizeP
 
 	log.Fatal(s.ListenAndServe())
+}
+
+func withDB(db *dbConn, fn func(*dbConn, http.ResponseWriter, *http.Request, httprouter.Params)) func(http.ResponseWriter, *http.Request, httprouter.Params) {
+	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+		fn(db, w, r, ps)
+	}
 }
 
 func write400Error(w http.ResponseWriter, err string) error {
@@ -51,7 +57,7 @@ Returns 400 on invalid request
 Returns 200 on successful insertion
 Returns 404 if metric doesn't exist
 */
-func insertPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func insertPointsHandler(db *dbConn, w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("insert_points request from %s", r.RemoteAddr)
 
 	typeHeader := r.Header.Values("Content-Type")
@@ -90,7 +96,7 @@ func insertPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 		queries = append(queries, query)
 	}
 
-	err := insertPoints(queries)
+	err := insertPoints(db, queries)
 	if err != nil {
 		if err == errMetricDoesNotExist {
 			log.Println(err)
@@ -112,7 +118,7 @@ Returns 400 on invalid request
 Returns 200 on successful query
 Returns 404 if metric doesn't exist
 */
-func queryPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func queryPointsHandler(db *dbConn, w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("query_points request from %s", r.RemoteAddr)
 
 	typeHeader := r.Header.Values("Content-Type")
@@ -145,7 +151,7 @@ func queryPointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 		return
 	}
 
-	pts, err := queryPoints(req)
+	pts, err := queryPoints(db, req)
 
 	if err != nil {
 		if err.Error() == "metric does not exist" {
@@ -173,7 +179,7 @@ Returns 400 on invalid request
 Returns 404 on metrics that don't exist
 Returns 200 on successful deletion
 */
-func deletePointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func deletePointsHandler(db *dbConn, w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("delete_points request from %s", r.RemoteAddr)
 
 	typeHeader := r.Header.Values("Content-Type")
@@ -205,7 +211,7 @@ func deletePointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 		return
 	}
 
-	if err := deletePoints(req); err != nil {
+	if err := deletePoints(db, req); err != nil {
 		log.Error(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
 			log.Error(err0)
@@ -220,7 +226,7 @@ func deletePointsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 Returns 400 on invalid request
 Returns 200 on successful request
 */
-func addDownsamplerHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func addDownsamplerHandler(db *dbConn, w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("add_downsampler request from %s", r.RemoteAddr)
 
 	typeHeader := r.Header.Values("Content-Type")
@@ -255,7 +261,7 @@ func addDownsamplerHandler(w http.ResponseWriter, r *http.Request, _ httprouter.
 		return
 	}
 
-	err := addDownsampler(req)
+	err := addDownsampler(db, req)
 
 	if err != nil {
 		log.Error(err)
@@ -272,10 +278,10 @@ func addDownsamplerHandler(w http.ResponseWriter, r *http.Request, _ httprouter.
 Returns 200 on successful request
 Returns 500 on server failure
 */
-func listDownsamplersHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func listDownsamplersHandler(db *dbConn, w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("list_downsampler request from %s", r.RemoteAddr)
 
-	downsamplers, err := selectDownsamplers()
+	downsamplers, err := selectDownsamplers(db)
 	if err != nil {
 		log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -295,7 +301,7 @@ func listDownsamplersHandler(w http.ResponseWriter, r *http.Request, _ httproute
 Returns 400 on invalid request
 Returns 200 on successful request
 */
-func deleteDownsamplerHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func deleteDownsamplerHandler(db *dbConn, w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("delete_downsampler request from %s", r.RemoteAddr)
 
 	typeHeader := r.Header.Values("Content-Type")
@@ -327,7 +333,7 @@ func deleteDownsamplerHandler(w http.ResponseWriter, r *http.Request, _ httprout
 		return
 	}
 
-	if err := deleteDownsampler(del); err != nil {
+	if err := deleteDownsampler(db, del); err != nil {
 		log.Error(err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
 			log.Error(err0)

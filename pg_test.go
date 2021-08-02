@@ -11,6 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var (
+	db0 *dbConn
+)
+
 func TestMain(t *testing.T) {
 	log.SetLevel(log.FatalLevel)
 	cfg := map[string]string{}
@@ -25,9 +29,9 @@ func TestMain(t *testing.T) {
 	if p, ok := cfg["postgres_password"]; ok {
 		pgPassword = p
 	}
-	initDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], port, cfg["postgres_db"]+"_test", cfg["postgres_ssl_mode"])
+	db0 = initDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], port, cfg["postgres_db"]+"_test", cfg["postgres_ssl_mode"], 1)
 
-	err = db.Query(0, func(db *sql.DB) error {
+	err = db0.Query(0, func(db *sql.DB) error {
 		_, err = db.Exec("DELETE FROM simpletsdb_metrics WHERE true")
 		return err
 	})
@@ -53,11 +57,11 @@ func TestDownsample(t *testing.T) {
 		})
 	}
 
-	if err := insertPoints(ipts); err != nil {
+	if err := insertPoints(db0, ipts); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := downsample(&downsampler{
+	if err := downsample(db0, &downsampler{
 		Metric:      "test09z",
 		OutMetric:   "test09z_15m",
 		RunEvery:    "15m",
@@ -79,7 +83,7 @@ func TestDownsample(t *testing.T) {
 }
 
 func TestInvalidMetricNameIninsertPoint(t *testing.T) {
-	if err := insertPoints([]*insertPointQuery{
+	if err := insertPoints(db0, []*insertPointQuery{
 		{Metric: " a b"},
 	}); err == nil {
 		t.Fatal("expected error")
@@ -89,7 +93,7 @@ func TestInvalidMetricNameIninsertPoint(t *testing.T) {
 }
 
 func TestInvalidMetricNameInQuery(t *testing.T) {
-	if _, err := queryPoints(&pointsQuery{
+	if _, err := queryPoints(db0, &pointsQuery{
 		Metric: " a b",
 	}); err == nil {
 		t.Fatal("expected error")
@@ -99,7 +103,7 @@ func TestInvalidMetricNameInQuery(t *testing.T) {
 }
 
 func TestMetricRequired(t *testing.T) {
-	if _, err := queryPoints(&pointsQuery{}); err == nil {
+	if _, err := queryPoints(db0, &pointsQuery{}); err == nil {
 		t.Fatal("expected error")
 	} else if err != errMetricRequired {
 		t.Fatalf("wrong error: %s", err)
@@ -143,11 +147,11 @@ func TestInsertPointAndQuery(t *testing.T) {
 			},
 		},
 	}
-	err := insertPoints(pts)
+	err := insertPoints(db0, pts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	points, err := queryPoints(&pointsQuery{
+	points, err := queryPoints(db0, &pointsQuery{
 		Metric: "test0",
 		Tags: map[string]string{
 			"id":   "25862",
@@ -181,12 +185,12 @@ func TestDeletePoints(t *testing.T) {
 		})
 	}
 
-	err := insertPoints(pts)
+	err := insertPoints(db0, pts)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = deletePoints(&deletePointsQuery{
+	err = deletePoints(db0, &deletePointsQuery{
 		Metric: "test9",
 		Start:  baseTime.Add(time.Minute * 20).UnixNano(),
 		End:    baseTime.Add(time.Minute * 30).UnixNano(),
@@ -198,7 +202,7 @@ func TestDeletePoints(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	points, err := queryPoints(&pointsQuery{
+	points, err := queryPoints(db0, &pointsQuery{
 		Metric: "test9",
 		Start:  baseTime.UnixNano(),
 		End:    baseTime.Add(time.Minute * 50).UnixNano(),
@@ -230,7 +234,7 @@ func TestDuplicateInsert(t *testing.T) {
 			},
 		},
 	}
-	err := insertPoints(insertPts)
+	err := insertPoints(db0, insertPts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,12 +248,12 @@ func TestDuplicateInsert(t *testing.T) {
 			},
 		},
 	}
-	err = insertPoints(insertPts)
+	err = insertPoints(db0, insertPts)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	pts, err := queryPoints(&pointsQuery{
+	pts, err := queryPoints(db0, &pointsQuery{
 		Metric: "test2",
 		Start:  time.Now().Add(-time.Hour).UnixNano(),
 	})
@@ -279,12 +283,12 @@ func TestWindowAggregator(t *testing.T) {
 		})
 	}
 
-	err := insertPoints(insertPts)
+	err := insertPoints(db0, insertPts)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	points, err := queryPoints(&pointsQuery{
+	points, err := queryPoints(db0, &pointsQuery{
 		Metric: "test1",
 		Tags: map[string]string{
 			"id": "1",

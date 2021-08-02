@@ -30,20 +30,20 @@ func (b *AtomicBool) Get() bool {
 	return atomic.LoadInt32(&(b.flag)) != 0
 }
 
-type Item struct {
+type item struct {
 	fn       func(*sql.DB) error
 	done     chan error
 	priority int
 	index    int
 }
 
-type DB struct {
-	queue *PriorityQueue
+type dbConn struct {
+	queue *priorityQueue
 	cond  *sync.Cond
 }
 
-func (db *DB) Query(priority int, fn func(*sql.DB) error) error {
-	item := &Item{
+func (db *dbConn) Query(priority int, fn func(*sql.DB) error) error {
+	item := &item{
 		fn:       fn,
 		priority: priority,
 		done:     make(chan error),
@@ -58,28 +58,28 @@ func (db *DB) Query(priority int, fn func(*sql.DB) error) error {
 	return err
 }
 
-type PriorityQueue []*Item
+type priorityQueue []*item
 
-func (pq PriorityQueue) Len() int { return len(pq) }
+func (pq priorityQueue) Len() int { return len(pq) }
 
-func (pq PriorityQueue) Less(i, j int) bool {
+func (pq priorityQueue) Less(i, j int) bool {
 	return pq[i].priority > pq[j].priority
 }
 
-func (pq PriorityQueue) Swap(i, j int) {
+func (pq priorityQueue) Swap(i, j int) {
 	pq[i], pq[j] = pq[j], pq[i]
 	pq[i].index = i
 	pq[j].index = j
 }
 
-func (pq *PriorityQueue) Push(x interface{}) {
+func (pq *priorityQueue) Push(x interface{}) {
 	n := len(*pq)
-	item := x.(*Item)
+	item := x.(*item)
 	item.index = n
 	*pq = append(*pq, item)
 }
 
-func (pq *PriorityQueue) Pop() interface{} {
+func (pq *priorityQueue) Pop() interface{} {
 	old := *pq
 	n := len(old)
 	item := old[n-1]

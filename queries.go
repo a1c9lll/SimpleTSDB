@@ -72,7 +72,7 @@ func databaseExists(name string, session *sql.DB) (bool, error) {
 	return found, err
 }
 
-func tableExists(name string) (bool, error) {
+func tableExists(db *dbConn, name string) (bool, error) {
 	var (
 		name0 string
 		found bool
@@ -108,7 +108,7 @@ func tableExists(name string) (bool, error) {
 	return found, err
 }
 
-func selectDownsamplers() ([]*downsampler, error) {
+func selectDownsamplers(db *dbConn) ([]*downsampler, error) {
 	var (
 		downsamplers0 []*downsampler
 	)
@@ -175,7 +175,7 @@ func generateTagsIndexString(ss []string) string {
 	return s.String()
 }
 
-func createIndex(tags []string) {
+func createIndex(db *dbConn, tags []string) {
 	s := generateTagsIndexString(tags)
 
 	createIndexMutex.Lock()
@@ -279,7 +279,7 @@ func generateInsertStringsAndValues(queries []*insertPointQuery) (string, []inte
 	return valuesStrBuilder.String(), values, uniqueTagCombinations, nil
 }
 
-func insertPoints(queries0 []*insertPointQuery) error {
+func insertPoints(db *dbConn, queries0 []*insertPointQuery) error {
 	if len(queries0) == 0 {
 		return nil
 	}
@@ -295,7 +295,7 @@ func insertPoints(queries0 []*insertPointQuery) error {
 			if len(s) == 0 {
 				continue
 			}
-			go createIndex(s)
+			go createIndex(db, s)
 		}
 		err = db.Query(priorityCRUD, func(session *sql.DB) error {
 			queryStr := fmt.Sprintf(`INSERT INTO %s (metric,timestamp,value,tags) VALUES %s ON CONFLICT DO NOTHING` /* */, metricsTable, valuesStr)
@@ -330,7 +330,7 @@ func generateTagsQueryStringAndValues(tags map[string]string, queryVals []interf
 	return s.String(), queryVals, nil
 }
 
-func queryPoints(query *pointsQuery) ([]*point, error) {
+func queryPoints(db *dbConn, query *pointsQuery) ([]*point, error) {
 	if query.Metric == "" {
 		return nil, errMetricRequired
 	}
@@ -372,7 +372,7 @@ func queryPoints(query *pointsQuery) ([]*point, error) {
 				i++
 			}
 			sort.Strings(tags)
-			go createIndex(tags)
+			go createIndex(db, tags)
 		}
 	}
 
@@ -470,7 +470,7 @@ func queryPoints(query *pointsQuery) ([]*point, error) {
 	return points, nil
 }
 
-func deletePoints(query *deletePointsQuery) error {
+func deletePoints(db *dbConn, query *deletePointsQuery) error {
 	if query.Metric == "" {
 		return errMetricRequired
 	}
@@ -513,7 +513,7 @@ func deletePoints(query *deletePointsQuery) error {
 	return nil
 }
 
-func addDownsampler(ds *downsampler) error {
+func addDownsampler(db *dbConn, ds *downsampler) error {
 	if ds.Metric == "" {
 		return errMetricRequired
 	}
@@ -578,12 +578,12 @@ func addDownsampler(ds *downsampler) error {
 
 	downsamplers = append(downsamplers, ds)
 
-	go waitDownsample(ds)
+	go waitDownsample(db, ds)
 
 	return nil
 }
 
-func deleteDownsampler(ds *deleteDownsamplerRequest) error {
+func deleteDownsampler(db *dbConn, ds *deleteDownsamplerRequest) error {
 	query := fmt.Sprintf("DELETE FROM %s WHERE id = $1", downsamplersTable)
 	vals := []interface{}{
 		ds.ID,
@@ -610,7 +610,7 @@ func deleteDownsampler(ds *deleteDownsamplerRequest) error {
 	return nil
 }
 
-func selectLastTimestamp(metric string, tags map[string]string) (int64, error) {
+func selectLastTimestamp(db *dbConn, metric string, tags map[string]string) (int64, error) {
 	vals := []interface{}{
 		metric,
 	}
@@ -636,7 +636,7 @@ func selectLastTimestamp(metric string, tags map[string]string) (int64, error) {
 	return timestamp, err
 }
 
-func selectFirstTimestamp(metric string, tags map[string]string) (int64, error) {
+func selectFirstTimestamp(db *dbConn, metric string, tags map[string]string) (int64, error) {
 	vals := []interface{}{
 		metric,
 	}
@@ -663,7 +663,7 @@ func selectFirstTimestamp(metric string, tags map[string]string) (int64, error) 
 	return timestamp, err
 }
 
-func updateFirstPointDownsample(metric string, tags map[string]string, point *point) error {
+func updateFirstPointDownsample(db *dbConn, metric string, tags map[string]string, point *point) error {
 	vals := []interface{}{
 		point.Value,
 		metric,
@@ -687,7 +687,7 @@ func updateFirstPointDownsample(metric string, tags map[string]string, point *po
 	return nil
 }
 
-func updateLastDownsampledWindow(id int64, lastTimestamp int64) error {
+func updateLastDownsampledWindow(db *dbConn, id int64, lastTimestamp int64) error {
 	vals := []interface{}{
 		lastTimestamp,
 		id,
