@@ -19,7 +19,7 @@ func main() {
 	if err := loadConfig(*configLocation, cfg); err != nil {
 		log.Fatal(err)
 	}
-	// init db
+	// parse db variables
 	if v, ok := cfg["postgres_username"]; v == "" || !ok {
 		log.Fatal("postgres_username config is required")
 	}
@@ -43,19 +43,17 @@ func main() {
 		pgPassword = p
 	}
 
+	dbPort, err := strconv.Atoi(cfg["postgres_port"])
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	nConnWorkers, err := strconv.Atoi(cfg["postgres_n_conn_workers"])
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	dbPort, err := strconv.Atoi(cfg["postgres_port"])
-	if err != nil {
-		log.Fatal(err)
-	}
-	db := initDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], dbPort, cfg["postgres_db"], cfg["postgres_ssl_mode"], nConnWorkers)
-
-	log.Infof("Connected to database [%s] at %s:%d", cfg["postgres_db"], cfg["postgres_host"], dbPort)
-	// init server
+	// parse server variables
 	if v, ok := cfg["simpletsdb_bind_host"]; v == "" || !ok {
 		log.Fatal("simpletsdb_bind_host config is required")
 	}
@@ -99,6 +97,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// init db
+	db := initDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], dbPort, cfg["postgres_db"], cfg["postgres_ssl_mode"], nConnWorkers)
+	log.Infof("Connected to database [%s] at %s:%d", cfg["postgres_db"], cfg["postgres_host"], dbPort)
+
+	// init server
 	log.Infof("Initializing server at %s:%d", cfg["simpletsdb_bind_host"], serverPort)
 	initServer(db, cfg["simpletsdb_bind_host"], serverPort, serverReadTimeout, serverWriteTimeout, readLineProtocolBufferSize)
 }
