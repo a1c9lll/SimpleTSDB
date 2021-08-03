@@ -29,7 +29,7 @@ func TestMain(t *testing.T) {
 	if p, ok := cfg["postgres_password"]; ok {
 		pgPassword = p
 	}
-	db0 = initDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], port, cfg["postgres_db"]+"_test", cfg["postgres_ssl_mode"], 1)
+	db0, _ = initDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], port, cfg["postgres_db"]+"_test", cfg["postgres_ssl_mode"], 1)
 
 	err = db0.Query(0, func(db *sql.DB) error {
 		_, err = db.Exec("DELETE FROM simpletsdb_metrics WHERE true")
@@ -93,7 +93,7 @@ func TestInvalidMetricNameIninsertPoint(t *testing.T) {
 }
 
 func TestInvalidMetricNameInQuery(t *testing.T) {
-	if _, err := queryPoints(db0, &pointsQuery{
+	if _, err := queryPoints(db0, priorityCRUD, &pointsQuery{
 		Metric: " a b",
 	}); err == nil {
 		t.Fatal("expected error")
@@ -103,7 +103,7 @@ func TestInvalidMetricNameInQuery(t *testing.T) {
 }
 
 func TestMetricRequired(t *testing.T) {
-	if _, err := queryPoints(db0, &pointsQuery{}); err == nil {
+	if _, err := queryPoints(db0, priorityCRUD, &pointsQuery{}); err == nil {
 		t.Fatal("expected error")
 	} else if err != errMetricRequired {
 		t.Fatalf("wrong error: %s", err)
@@ -151,7 +151,7 @@ func TestInsertPointAndQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	points, err := queryPoints(db0, &pointsQuery{
+	points, err := queryPoints(db0, priorityCRUD, &pointsQuery{
 		Metric: "test0",
 		Tags: map[string]string{
 			"id":   "25862",
@@ -202,7 +202,7 @@ func TestDeletePoints(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	points, err := queryPoints(db0, &pointsQuery{
+	points, err := queryPoints(db0, priorityCRUD, &pointsQuery{
 		Metric: "test9",
 		Start:  baseTime.UnixNano(),
 		End:    baseTime.Add(time.Minute * 50).UnixNano(),
@@ -253,7 +253,7 @@ func TestDuplicateInsert(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pts, err := queryPoints(db0, &pointsQuery{
+	pts, err := queryPoints(db0, priorityCRUD, &pointsQuery{
 		Metric: "test2",
 		Start:  time.Now().Add(-time.Hour).UnixNano(),
 	})
@@ -288,7 +288,7 @@ func TestWindowAggregator(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	points, err := queryPoints(db0, &pointsQuery{
+	points, err := queryPoints(db0, priorityCRUD, &pointsQuery{
 		Metric: "test1",
 		Tags: map[string]string{
 			"id": "1",

@@ -21,7 +21,7 @@ var (
 	errLastDownsampledWindowType = errors.New("incorrect type for lastDownsampledWindow")
 )
 
-func initDB(pgUser, pgPassword, pgHost string, pgPort int, pgDB, pgSSLMode string, nWorkers int) *dbConn {
+func initDB(pgUser, pgPassword, pgHost string, pgPort int, pgDB, pgSSLMode string, nWorkers int) (*dbConn, chan struct{}) {
 	var passwordString string
 	if pgPassword != "" {
 		passwordString = fmt.Sprintf("password='%s' ", pgPassword)
@@ -105,14 +105,16 @@ CREATE TABLE %s (
 		log.Fatalf("could not create %s table", downsamplersTable)
 	}
 
-	go handleDownsamplers(db)
+	cancelDownsampleWait := make(chan struct{})
+	go handleDownsamplers(db, cancelDownsampleWait)
 
-	return db
+	return db, cancelDownsampleWait
 }
 
 //select id, out_metric, last_updated, run_every,  (last_updated + run_every)::bigint - (extract(epoch from now())*1000000000)::bigint as time_until_update from simpletsdb_downsamplers;
-func handleDownsamplers(db *dbConn) {
+func handleDownsamplers(db *dbConn, cancelDownsampleWait chan struct{}) {
 	for {
+	start:
 		var (
 			timeUntilUpdate int64
 			ds              = &downsampler{}
@@ -173,7 +175,11 @@ func handleDownsamplers(db *dbConn) {
 		}
 		if timeUntilUpdate > 0 {
 			log.Infof("waiting %s for downsampler %d", time.Duration(timeUntilUpdate), ds.ID)
-			time.Sleep(time.Duration(timeUntilUpdate))
+			select {
+			case <-cancelDownsampleWait:
+				goto start
+			case <-time.After(time.Duration(timeUntilUpdate)):
+			}
 		}
 		t0 := time.Now()
 		err = downsample(db, ds)

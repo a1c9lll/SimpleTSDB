@@ -330,14 +330,13 @@ func generateTagsQueryStringAndValues(tags map[string]string, queryVals []interf
 	return s.String(), queryVals, nil
 }
 
-func queryPoints(db *dbConn, query *pointsQuery) ([]*point, error) {
+func queryPoints(db *dbConn, priority int, query *pointsQuery) ([]*point, error) {
 	if query.Metric == "" {
 		return nil, errMetricRequired
 	}
 	if !metricAndTagsRe.MatchString(query.Metric) {
 		return nil, errUnsupportedMetricName
 	}
-
 	if query.Start == 0 {
 		return nil, errStartRequired
 	}
@@ -380,14 +379,13 @@ func queryPoints(db *dbConn, query *pointsQuery) ([]*point, error) {
 		points []*point
 	)
 
-	err = db.Query(priorityCRUD, func(session *sql.DB) error {
+	err = db.Query(priority, func(session *sql.DB) error {
 		queryStr := fmt.Sprintf(`SELECT timestamp, value FROM %s WHERE metric = $1 AND timestamp >= $2 AND timestamp <= $3%s ORDER BY timestamp ASC%s`, metricsTable, tagStr, limitStr)
 
 		scanner, err := session.Query(queryStr, queryVals...)
 		if err != nil {
 			return err
 		}
-
 		var (
 			val interface{}
 		)
@@ -513,7 +511,7 @@ func deletePoints(db *dbConn, query *deletePointsQuery) error {
 	return nil
 }
 
-func addDownsampler(db *dbConn, ds *downsampler) error {
+func addDownsampler(db *dbConn, cancelDownsampleWait chan struct{}, ds *downsampler) error {
 	if ds.Metric == "" {
 		return errMetricRequired
 	}
@@ -576,6 +574,8 @@ func addDownsampler(db *dbConn, ds *downsampler) error {
 	if err != nil {
 		return err
 	}
+
+	cancelDownsampleWait <- struct{}{}
 
 	return nil
 }

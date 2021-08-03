@@ -98,10 +98,10 @@ func main() {
 	}
 
 	// init db
-	db := initDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], dbPort, cfg["postgres_db"], cfg["postgres_ssl_mode"], nConnWorkers)
+	db, cancelDownsampleWait := initDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], dbPort, cfg["postgres_db"], cfg["postgres_ssl_mode"], nConnWorkers)
 	log.Infof("Connected to database [%s] at %s:%d", cfg["postgres_db"], cfg["postgres_host"], dbPort)
 
 	// init server
 	log.Infof("Initializing server at %s:%d", cfg["simpletsdb_bind_host"], serverPort)
-	initServer(db, cfg["simpletsdb_bind_host"], serverPort, serverReadTimeout, serverWriteTimeout, readLineProtocolBufferSize)
+	initServer(db, cancelDownsampleWait, cfg["simpletsdb_bind_host"], serverPort, serverReadTimeout, serverWriteTimeout, readLineProtocolBufferSize)
 }

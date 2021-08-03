@@ -43,7 +43,7 @@ func TestInsertPointsHandler(t *testing.T) {
 		t.Fatal()
 	}
 
-	pts, err := queryPoints(db0, &pointsQuery{
+	pts, err := queryPoints(db0, priorityCRUD, &pointsQuery{
 		Metric: "test7",
 		Start:  baseTime.UnixNano(),
 		Tags: map[string]string{
@@ -150,7 +150,7 @@ func TestDeletePointsHandler(t *testing.T) {
 		t.Fatal()
 	}
 
-	points, err := queryPoints(db0, &pointsQuery{
+	points, err := queryPoints(db0, priorityCRUD, &pointsQuery{
 		Metric: "test10",
 		Start:  baseTime.UnixNano(),
 		End:    baseTime.Add(time.Minute * 4).UnixNano(),
@@ -193,7 +193,8 @@ func TestDownsamplerAPI(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	addDownsamplerHandler(db0, w, req, nil)
+	c := make(chan struct{}, 1)
+	addDownsamplerHandler(db0, c, w, req, nil)
 
 	resp := w.Result()
 
@@ -223,7 +224,7 @@ func TestDownsamplerAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(downsamplers) == 0 {
+	if len(downsamplers0) == 0 {
 		t.Fatal("expected > 0 downsamplers")
 	}
 

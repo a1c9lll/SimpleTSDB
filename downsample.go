@@ -1,7 +1,5 @@
 package main
 
-//select id, out_metric, last_updated, run_every,  (last_updated + run_every)::bigint - (extract(epoch from now())*1000000000)::bigint as time_until_update from simpletsdb_downsamplers;
-
 func downsample(db *dbConn, ds *downsampler) error {
 	var (
 		startTime             int64
@@ -33,7 +31,7 @@ func downsample(db *dbConn, ds *downsampler) error {
 			return err
 		}
 	}
-	pts, err := queryPoints(db, &pointsQuery{
+	pts, err := queryPoints(db, priorityDownsamplers, &pointsQuery{
 		Metric:      ds.Metric,
 		Start:       startTime,
 		End:         endTime,
