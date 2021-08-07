@@ -80,6 +80,22 @@ func TestDownsample(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+
+	pts, err := queryPoints(db0, priorityCRUD, &pointsQuery{
+		Metric: "test09z_15m",
+		Tags: map[string]string{
+			"id": "2",
+		},
+		Start: baseTime.UnixNano(),
+		End:   baseTime.Add(time.Hour).UnixNano(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(pts) != 4 {
+		t.Fatalf("expected 4 points, got %d", len(pts))
+	}
 }
 
 func TestInvalidMetricNameIninsertPoint(t *testing.T) {

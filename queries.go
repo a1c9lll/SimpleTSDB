@@ -660,7 +660,7 @@ func selectFirstTimestamp(db *dbConn, metric string, tags map[string]string) (in
 	return timestamp, err
 }
 
-func updateFirstPointDownsample(db *dbConn, metric string, tags map[string]string, point *point) error {
+func updateFirstPointDownsampleTx(tx *sql.Tx, metric string, tags map[string]string, point *point) error {
 	vals := []interface{}{
 		point.Value,
 		metric,
@@ -670,34 +670,48 @@ func updateFirstPointDownsample(db *dbConn, metric string, tags map[string]strin
 	if err != nil {
 		return err
 	}
-	err = db.Query(priorityDownsamplers, func(session *sql.DB) error {
-		query := fmt.Sprintf("UPDATE %s SET value = $1 WHERE metric = $2 AND timestamp = $3%s", metricsTable, tagsStr)
-		if _, err := session.Exec(query, vals...); err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
+	query := fmt.Sprintf("UPDATE %s SET value = $1 WHERE metric = $2 AND timestamp = $3%s", metricsTable, tagsStr)
+	if _, err := tx.Exec(query, vals...); err != nil {
 		return err
 	}
-
 	return nil
 }
 
-func updateLastDownsampledWindow(db *dbConn, id int64, lastTimestamp int64) error {
+func updateLastDownsampledWindowTx(tx *sql.Tx, id int64, lastTimestamp int64) error {
 	vals := []interface{}{
 		lastTimestamp,
 		id,
 	}
-	err := db.Query(priorityDownsamplers, func(session *sql.DB) error {
-		query := fmt.Sprintf("UPDATE %s SET last_downsampled_window = $1 WHERE id = $2", downsamplersTable)
-		if _, err := session.Exec(query, vals...); err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
+	query := fmt.Sprintf("UPDATE %s SET last_downsampled_window = $1 WHERE id = $2", downsamplersTable)
+	if _, err := tx.Exec(query, vals...); err != nil {
 		return err
 	}
+	return nil
+}
+
+func insertPointsTx(db *dbConn, tx *sql.Tx, queries0 []*insertPointQuery) error {
+	if len(queries0) == 0 {
+		return nil
+	}
+	// batch the queries insertBatchSize at a time to get around
+	// max insert limit of postgres
+	for i := 0; i < len(queries0); i += insertBatchSize {
+		queries := queries0[i:min1(i+insertBatchSize, len(queries0))]
+		valuesStr, values, uniqueTagCombinations, err := generateInsertStringsAndValues(queries)
+		if err != nil {
+			return err
+		}
+		for _, s := range uniqueTagCombinations {
+			if len(s) == 0 {
+				continue
+			}
+			go createIndex(db, s)
+		}
+		queryStr := fmt.Sprintf(`INSERT INTO %s (metric,timestamp,value,tags) VALUES %s ON CONFLICT DO NOTHING` /* */, metricsTable, valuesStr)
+		if _, err := tx.Exec(queryStr, values...); err != nil { //&& err.Error() != fmt.Sprintf(errStringDuplicate, strings.ToLower(firstMetric)) {
+			return err
+		}
+	}
+
 	return nil
 }
