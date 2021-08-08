@@ -117,7 +117,7 @@ CREATE TABLE %s (
 	}
 
 	downsamplersCount, err := selectDownsamplersCount(db)
-	if err != nil && err.Error() == `sql: no rows in result set` {
+	if err != nil && err.Error() == errStrNoRowsInResultSet {
 		if err0 := insertDownsamplersInitialCount(db); err0 != nil {
 			log.Fatalf("initDB: downsampleCoordinator start: %s", err0)
 		}
@@ -135,25 +135,4 @@ CREATE TABLE %s (
 	}
 
 	return db, nextDownsamplerIDChan, cancelDownsampleWait
-}
-
-func downsampleCountCoordinator(db *dbConn, downsamplersCount int, nextDownsamplerIDChan chan int) {
-	for {
-		nextDownsamplerIDChan <- downsamplersCount
-		downsamplersCount++
-		if downsamplersCount >= downsamplerWorkerCount {
-			downsamplersCount = 0
-		}
-		err := db.Query(priorityDownsamplers, func(db *sql.DB) error {
-			query := fmt.Sprintf("UPDATE %s SET worker_id_count = $1", metaTable)
-			_, err := db.Exec(query, downsamplersCount)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-		if err != nil {
-			log.Errorf("downsampleCoordinator: %s", err)
-		}
-	}
 }

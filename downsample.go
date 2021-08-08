@@ -16,7 +16,29 @@ var (
 	errLastDownsampledWindowType = errors.New("incorrect type for lastDownsampledWindow")
 )
 
+func downsampleCountCoordinator(db *dbConn, downsamplersCount int, nextDownsamplerIDChan chan int) {
+	for {
+		nextDownsamplerIDChan <- downsamplersCount
+		downsamplersCount++
+		if downsamplersCount >= downsamplerWorkerCount {
+			downsamplersCount = 0
+		}
+		err := db.Query(priorityDownsamplers, func(db *sql.DB) error {
+			query := fmt.Sprintf("UPDATE %s SET worker_id_count = $1", metaTable)
+			_, err := db.Exec(query, downsamplersCount)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			log.Errorf("downsampleCoordinator: %s", err)
+		}
+	}
+}
+
 //select id, out_metric, last_updated, run_every,  (last_updated + run_every)::bigint - (extract(epoch from now())*1000000000)::bigint as time_until_update from simpletsdb_downsamplers;
+
 func handleDownsamplers(db *dbConn, workerID int, cancelDownsampleWait chan struct{}) {
 	for {
 	start:
@@ -73,14 +95,13 @@ func handleDownsamplers(db *dbConn, workerID int, cancelDownsampleWait chan stru
 			return nil
 		})
 		if err != nil {
-			if err.Error() == "sql: no rows in result set" {
+			if err.Error() == errStrNoRowsInResultSet {
 				time.Sleep(time.Second)
 				continue
 			}
 			panic(err)
 		}
 		if timeUntilUpdate > 0 {
-			log.Infof("waiting %s for downsampler %d", time.Duration(timeUntilUpdate), ds.ID)
 			select {
 			case <-cancelDownsampleWait:
 				goto start
@@ -110,7 +131,7 @@ func handleDownsamplers(db *dbConn, workerID int, cancelDownsampleWait chan stru
 			panic(err)
 		}
 		t1 := time.Since(t0)
-		log.Debugf("downsample %d took %dms", ds.ID, t1.Milliseconds())
+		log.Infof("downsample %d took %dms", ds.ID, t1.Milliseconds())
 	}
 }
 
