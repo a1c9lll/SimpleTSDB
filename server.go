@@ -16,12 +16,12 @@ var (
 	readLineProtocolBufferSize = 65536
 )
 
-func initServer(db *dbConn, cancelDownsampleWait chan struct{}, tsdbHost string, tsdbPort int, tsdbReadTimeout, tsdbWriteTimeout time.Duration, readLineProtocolBufferSizeP int) {
+func initServer(db *dbConn, downsamplersCountChan chan int, cancelDownsampleWait chan struct{}, tsdbHost string, tsdbPort int, tsdbReadTimeout, tsdbWriteTimeout time.Duration, readLineProtocolBufferSizeP int) {
 	router := httprouter.New()
 	router.POST("/insert_points", withDB(db, insertPointsHandler))
 	router.POST("/query_points", withDB(db, queryPointsHandler))
 	router.DELETE("/delete_points", withDB(db, deletePointsHandler))
-	router.POST("/add_downsampler", withCancelDownsampleWait(db, cancelDownsampleWait, addDownsamplerHandler))
+	router.POST("/add_downsampler", withDbAndDownsamplerChannels(db, downsamplersCountChan, cancelDownsampleWait, addDownsamplerHandler))
 	router.GET("/list_downsamplers", withDB(db, listDownsamplersHandler))
 	router.DELETE("/delete_downsampler", withDB(db, deleteDownsamplerHandler))
 
@@ -38,9 +38,9 @@ func initServer(db *dbConn, cancelDownsampleWait chan struct{}, tsdbHost string,
 	log.Fatalf("initServer: %s", s.ListenAndServe())
 }
 
-func withCancelDownsampleWait(db *dbConn, cancelDownsampleWait chan struct{}, fn func(*dbConn, chan struct{}, http.ResponseWriter, *http.Request, httprouter.Params)) func(http.ResponseWriter, *http.Request, httprouter.Params) {
+func withDbAndDownsamplerChannels(db *dbConn, downsamplersCountChan chan int, cancelDownsampleWait chan struct{}, fn func(*dbConn, chan int, chan struct{}, http.ResponseWriter, *http.Request, httprouter.Params)) func(http.ResponseWriter, *http.Request, httprouter.Params) {
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-		fn(db, cancelDownsampleWait, w, r, ps)
+		fn(db, downsamplersCountChan, cancelDownsampleWait, w, r, ps)
 	}
 }
 
@@ -231,7 +231,7 @@ func deletePointsHandler(db *dbConn, w http.ResponseWriter, r *http.Request, _ h
 Returns 400 on invalid request
 Returns 200 on successful request
 */
-func addDownsamplerHandler(db *dbConn, cancelDownsampleWait chan struct{}, w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func addDownsamplerHandler(db *dbConn, downsamplersCountChan chan int, cancelDownsampleWait chan struct{}, w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("add_downsampler request from %s", r.RemoteAddr)
 
 	typeHeader := r.Header.Values("Content-Type")
@@ -254,9 +254,7 @@ func addDownsamplerHandler(db *dbConn, cancelDownsampleWait chan struct{}, w htt
 
 	defer r.Body.Close()
 
-	req := &downsampler{
-		Deleted: &AtomicBool{},
-	}
+	req := &downsampler{}
 
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		log.Errorf("addDownsamplerHandler: %s", err)
@@ -266,7 +264,7 @@ func addDownsamplerHandler(db *dbConn, cancelDownsampleWait chan struct{}, w htt
 		return
 	}
 
-	err := addDownsampler(db, cancelDownsampleWait, req)
+	err := addDownsampler(db, downsamplersCountChan, cancelDownsampleWait, req)
 
 	if err != nil {
 		log.Errorf("addDownsamplerHandler: %s", err)

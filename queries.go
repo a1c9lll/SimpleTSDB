@@ -125,9 +125,7 @@ func selectDownsamplers(db *dbConn) ([]*downsampler, error) {
 			lastDownsampledWindow interface{}
 		)
 		for scanner.Next() {
-			ds := &downsampler{
-				Deleted: &AtomicBool{},
-			}
+			ds := &downsampler{}
 			err := scanner.Scan(
 				&ds.ID,
 				&ds.Metric,
@@ -164,6 +162,28 @@ func selectDownsamplers(db *dbConn) ([]*downsampler, error) {
 		return nil
 	})
 	return downsamplers0, err
+}
+
+func selectDownsamplersCount(db *dbConn) (int, error) {
+	var currentCount int
+	err := db.Query(priorityDownsamplers, func(db *sql.DB) error {
+		query := fmt.Sprintf("SELECT worker_id_count FROM %s", metaTable)
+		row := db.QueryRow(query)
+		if err := row.Scan(&currentCount); err != nil {
+			return err
+		}
+		return nil
+	})
+	return currentCount, err
+}
+
+func insertDownsamplersInitialCount(db *dbConn) error {
+	err := db.Query(priorityDownsamplers, func(db *sql.DB) error {
+		query := fmt.Sprintf("INSERT INTO %s (worker_id_count) VALUES ($1)", metaTable)
+		_, err := db.Exec(query, 0)
+		return err
+	})
+	return err
 }
 
 func generateTagsIndexString(ss []string) string {
@@ -511,7 +531,7 @@ func deletePoints(db *dbConn, query *deletePointsQuery) error {
 	return nil
 }
 
-func addDownsampler(db *dbConn, cancelDownsampleWait chan struct{}, ds *downsampler) error {
+func addDownsampler(db *dbConn, downsamplersCountChan chan int, cancelDownsampleWait chan struct{}, ds *downsampler) error {
 	if ds.Metric == "" {
 		return errMetricRequired
 	}
@@ -542,7 +562,7 @@ func addDownsampler(db *dbConn, cancelDownsampleWait chan struct{}, ds *downsamp
 	if len(ds.Query.Aggregators) == 0 {
 		return errOneAggregatorRequiredForDownsampler
 	}
-	query := fmt.Sprintf("INSERT INTO %s (metric,out_metric,last_updated,run_every,query) VALUES ($1,$2,$3,$4,$5) RETURNING id", downsamplersTable)
+	query := fmt.Sprintf("INSERT INTO %s (metric,out_metric,last_updated,run_every,query,worker_id) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id", downsamplersTable)
 	vals := []interface{}{
 		ds.Metric,
 		ds.OutMetric,
@@ -560,6 +580,7 @@ func addDownsampler(db *dbConn, cancelDownsampleWait chan struct{}, ds *downsamp
 		return err
 	}
 	vals = append(vals, buf.String())
+	vals = append(vals, <-downsamplersCountChan)
 
 	err = db.Query(priorityDownsamplers, func(session *sql.DB) error {
 		row := session.QueryRow(query, vals...)
@@ -598,7 +619,6 @@ func deleteDownsampler(db *dbConn, ds *deleteDownsamplerRequest) error {
 
 	for i, d := range downsamplers {
 		if d.ID == ds.ID {
-			d.Deleted.Set(true)
 			downsamplers = append(downsamplers[:i], downsamplers[i+1:]...)
 			break
 		}

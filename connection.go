@@ -12,12 +12,14 @@ import (
 )
 
 var (
-	metricsTable      = `simpletsdb_metrics`
-	downsamplersTable = `simpletsdb_downsamplers`
-	downsamplers      []*downsampler
+	metricsTable           = `simpletsdb_metrics`
+	downsamplersTable      = `simpletsdb_downsamplers`
+	metaTable              = `simpletsdb_meta`
+	downsamplers           []*downsampler
+	downsamplerWorkerCount = 32
 )
 
-func initDB(pgUser, pgPassword, pgHost string, pgPort int, pgDB, pgSSLMode string, nWorkers int) (*dbConn, chan struct{}) {
+func initDB(pgUser, pgPassword, pgHost string, pgPort int, pgDB, pgSSLMode string, nWorkers int) (*dbConn, chan int, chan struct{}) {
 	var passwordString string
 	if pgPassword != "" {
 		passwordString = fmt.Sprintf("password='%s' ", pgPassword)
@@ -66,9 +68,16 @@ CREATE TABLE %s (
   run_every bigint,
   last_downsampled_window bigint,
 	last_updated bigint NOT NULL,
+	worker_id int,
   query jsonb
 )
 		`, downsamplersTable))
+
+	session.Exec(fmt.Sprintf(`
+		CREATE TABLE %s (
+			worker_id_count int
+		)
+				`, metaTable))
 
 	db := &dbConn{queue: &priorityQueue{}, cond: sync.NewCond(&sync.Mutex{})}
 	heap.Init(db.queue)
@@ -101,8 +110,50 @@ CREATE TABLE %s (
 		log.Fatalf("initDB: could not create %s table", downsamplersTable)
 	}
 
-	cancelDownsampleWait := make(chan struct{})
-	go handleDownsamplers(db, cancelDownsampleWait)
+	if ok, err := tableExists(db, metaTable); err != nil {
+		log.Fatal(err)
+	} else if !ok {
+		log.Fatalf("initDB: could not create %s table", metaTable)
+	}
 
-	return db, cancelDownsampleWait
+	downsamplersCount, err := selectDownsamplersCount(db)
+	if err != nil && err.Error() == `sql: no rows in result set` {
+		if err0 := insertDownsamplersInitialCount(db); err0 != nil {
+			log.Fatalf("initDB: downsampleCoordinator start: %s", err0)
+		}
+	} else if err != nil {
+		log.Fatalf("initDB: downsampleCoordinator start: %s", err)
+	}
+
+	nextDownsamplerIDChan := make(chan int)
+	go downsampleCountCoordinator(db, downsamplersCount, nextDownsamplerIDChan)
+
+	cancelDownsampleWait := make(chan struct{})
+	for i := 0; i < downsamplerWorkerCount; i++ {
+		i := i
+		go handleDownsamplers(db, i, cancelDownsampleWait)
+	}
+
+	return db, nextDownsamplerIDChan, cancelDownsampleWait
+}
+
+func downsampleCountCoordinator(db *dbConn, downsamplersCount int, nextDownsamplerIDChan chan int) {
+	for {
+		nextDownsamplerIDChan <- downsamplersCount
+		downsamplersCount++
+		if downsamplersCount >= downsamplerWorkerCount {
+			downsamplersCount = 0
+		}
+		err := db.Query(priorityDownsamplers, func(db *sql.DB) error {
+			query := fmt.Sprintf("UPDATE %s SET worker_id_count = $1", metaTable)
+			_, err := db.Exec(query, downsamplersCount)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			log.Errorf("downsampleCoordinator: %s", err)
+		}
+	}
 }

@@ -17,7 +17,7 @@ var (
 )
 
 //select id, out_metric, last_updated, run_every,  (last_updated + run_every)::bigint - (extract(epoch from now())*1000000000)::bigint as time_until_update from simpletsdb_downsamplers;
-func handleDownsamplers(db *dbConn, cancelDownsampleWait chan struct{}) {
+func handleDownsamplers(db *dbConn, workerID int, cancelDownsampleWait chan struct{}) {
 	for {
 	start:
 		var (
@@ -32,8 +32,9 @@ func handleDownsamplers(db *dbConn, cancelDownsampleWait chan struct{}) {
 			)
 			vals := []interface{}{
 				time.Now().UnixNano(),
+				workerID,
 			}
-			row := db.QueryRow("select id,metric,out_metric,run_every,last_downsampled_window,query,(last_updated + run_every)::bigint - $1 as time_until_update from simpletsdb_downsamplers order by time_until_update asc limit 1", vals...)
+			row := db.QueryRow("select id,metric,out_metric,run_every,last_downsampled_window,query,(last_updated + run_every)::bigint - $1 as time_until_update from simpletsdb_downsamplers where worker_id = $2 order by time_until_update asc limit 1", vals...)
 			err := row.Scan(
 				&ds.ID,
 				&ds.Metric,
@@ -89,6 +90,10 @@ func handleDownsamplers(db *dbConn, cancelDownsampleWait chan struct{}) {
 		t0 := time.Now()
 		err = downsample(db, ds)
 		if err != nil {
+			/*log.Errorf("downsample error: %s", err)
+			time.Sleep(30 * time.Second)
+			goto retry
+			*/
 			panic(err)
 		}
 
@@ -156,6 +161,13 @@ func downsample(db *dbConn, ds *downsampler) error {
 		err = db.Query(priorityDownsamplers, func(db0 *sql.DB) error {
 			ctx := context.Background()
 			tx, err := db0.BeginTx(ctx, nil)
+
+			defer func() {
+				if err := tx.Commit(); err != nil {
+					log.Errorf("downsample commit error: %s", err)
+				}
+			}()
+
 			if err != nil {
 				return err
 			}
@@ -192,10 +204,6 @@ func downsample(db *dbConn, ds *downsampler) error {
 					if err0 := tx.Rollback(); err0 != nil {
 						log.Errorf("insertPointsTx rollback error: %s", err0)
 					}
-					return err
-				}
-
-				if err := tx.Commit(); err != nil {
 					return err
 				}
 			}
