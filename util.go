@@ -16,10 +16,10 @@ import (
 )
 
 var (
-	configMatchRe     *regexp.Regexp = regexp.MustCompile("[#].*\\n|\\s+\\n|\\S+[=]|.*\n")
-	lineMatchRe                      = regexp.MustCompile(`^\s*([a-zA-Z0-9\-_.]+)\s*,\s*((?:[a-zA-Z0-9\-_.]+\s*=\s*[a-zA-Z0-9\-_.]+\s*)*)\s*,\s*([+-]?([0-9]+([.][0-9]*)?|[.][0-9]+))\s+([0-9]+)\s*$`)
-	errPointValueType                = errors.New("point value must be null or number")
-	errNoMatches                     = errors.New("parse line: invalid line protocol syntax - no matches")
+	configMatchRe     = regexp.MustCompile("[#].*\\n|\\s+\\n|\\S+[=]|.*\n")
+	lineMatchRe       = regexp.MustCompile(`^\s*([a-zA-Z0-9\-_.]+)\s*,\s*((?:[a-zA-Z0-9\-_.]+\s*=\s*[a-zA-Z0-9\-_.]+\s*)*)\s*,\s*([+-]?([0-9]+([.][0-9]*)?|[.][0-9]+))\s+([0-9]+)\s*$`)
+	errPointValueType = errors.New("point value must be null or number")
+	errNoMatches      = errors.New("parse line: invalid line protocol syntax - no matches")
 )
 
 // time utils
