@@ -67,7 +67,7 @@ func TestQueryPointsHandler(t *testing.T) {
 	baseTime := mustParseTime("2000-01-01T00:00:00Z")
 	vals := []float64{18765003.4, 18581431.53, 18631954.11}
 	for i := 0; i < 3; i++ {
-		pt, _ := parseLine([]byte(fmt.Sprintf("test6,id=28084 type=high,%f %d\n", vals[i], baseTime.Add(time.Minute*time.Duration(i)).UnixNano())))
+		pt, _ := parseLineProtocol([]byte(fmt.Sprintf("test6,id=28084 type=high,%f %d\n", vals[i], baseTime.Add(time.Minute*time.Duration(i)).UnixNano())))
 		queries = append(queries, pt)
 	}
 	err := insertPoints(db0, queries)
@@ -120,7 +120,7 @@ func TestDeletePointsHandler(t *testing.T) {
 	queries := []*insertPointQuery{}
 	baseTime := mustParseTime("2000-01-01T00:00:00Z")
 	for i := 0; i < 5; i++ {
-		q, _ := parseLine([]byte(fmt.Sprintf("test10,id=28084,999 %d\n", baseTime.Add(time.Minute*time.Duration(i)).UnixNano())))
+		q, _ := parseLineProtocol([]byte(fmt.Sprintf("test10,id=28084,999 %d\n", baseTime.Add(time.Minute*time.Duration(i)).UnixNano())))
 		queries = append(queries, q)
 	}
 	if err := insertPoints(db0, queries); err != nil {

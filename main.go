@@ -17,7 +17,7 @@ func main() {
 	// load config
 	cfg := map[string]string{}
 	if err := loadConfig(*configLocation, cfg); err != nil {
-		log.Fatal(err)
+		log.Fatalf("main: %s", err)
 	}
 	// parse db variables
 	if v, ok := cfg["postgres_username"]; v == "" || !ok {
@@ -45,12 +45,12 @@ func main() {
 
 	dbPort, err := strconv.Atoi(cfg["postgres_port"])
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("main: %s", err)
 	}
 
 	nConnWorkers, err := strconv.Atoi(cfg["postgres_n_conn_workers"])
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("main: %s", err)
 	}
 
 	// parse server variables
@@ -72,20 +72,20 @@ func main() {
 
 	serverPort, err := strconv.Atoi(cfg["simpletsdb_bind_port"])
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("main: %s", err)
 	}
 	serverReadTimeout, err := time.ParseDuration(cfg["simpletsdb_http_read_timeout"])
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("main: %s", err)
 	}
 	serverWriteTimeout, err := time.ParseDuration(cfg["simpletsdb_http_write_timeout"])
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("main: %s", err)
 	}
 
 	readLineProtocolBufferSize, err := strconv.Atoi(cfg["simpletsdb_line_buffer_size"])
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("main: %s", err)
 	}
 
 	if v, ok := cfg["simpletsdb_insert_batch_size"]; v == "" || !ok {
@@ -94,7 +94,7 @@ func main() {
 
 	insertBatchSize, err = strconv.Atoi(cfg["simpletsdb_insert_batch_size"])
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("main: %s", err)
 	}
 
 	// init db

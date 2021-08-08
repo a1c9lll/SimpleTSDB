@@ -215,7 +215,7 @@ func createIndex(db *dbConn, tags []string) {
 	})
 
 	if err != nil {
-		log.Error(err)
+		log.Errorf("createIndex: %s", err)
 	}
 }
 

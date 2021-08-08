@@ -35,7 +35,7 @@ func initServer(db *dbConn, cancelDownsampleWait chan struct{}, tsdbHost string,
 
 	readLineProtocolBufferSize = readLineProtocolBufferSizeP
 
-	log.Fatal(s.ListenAndServe())
+	log.Fatalf("initServer: %s", s.ListenAndServe())
 }
 
 func withCancelDownsampleWait(db *dbConn, cancelDownsampleWait chan struct{}, fn func(*dbConn, chan struct{}, http.ResponseWriter, *http.Request, httprouter.Params)) func(http.ResponseWriter, *http.Request, httprouter.Params) {
@@ -71,7 +71,7 @@ func insertPointsHandler(db *dbConn, w http.ResponseWriter, r *http.Request, _ h
 	if len(typeHeader) != 1 {
 		log.Error("insert_points: content-type not set")
 		if err0 := write400Error(w, "content-type not set"); err0 != nil {
-			log.Error(err0)
+			log.Errorf("insertPointsHandler: %s", err0)
 		}
 		return
 	}
@@ -79,7 +79,7 @@ func insertPointsHandler(db *dbConn, w http.ResponseWriter, r *http.Request, _ h
 	if typeHeader[0] != "application/x.simpletsdb.points" {
 		log.Error("insert_points: content-type must be application/x.simpletsdb.points")
 		if err0 := write400Error(w, "content-type must be application/x.simpletsdb.points"); err0 != nil {
-			log.Error(err0)
+			log.Errorf("insertPointsHandler: %s", err0)
 		}
 		return
 	}
@@ -91,11 +91,11 @@ func insertPointsHandler(db *dbConn, w http.ResponseWriter, r *http.Request, _ h
 	scanner.Buffer(buf, readLineProtocolBufferSize)
 	queries := []*insertPointQuery{}
 	for scanner.Scan() {
-		query, err := parseLine(scanner.Bytes())
+		query, err := parseLineProtocol(scanner.Bytes())
 		if err != nil {
-			log.Error(err)
+			log.Errorf("insertPointsHandler: %s", err)
 			if err0 := write400Error(w, err.Error()); err0 != nil {
-				log.Error(err0)
+				log.Errorf("insertPointsHandler: %s", err0)
 			}
 			return
 		}
@@ -105,12 +105,11 @@ func insertPointsHandler(db *dbConn, w http.ResponseWriter, r *http.Request, _ h
 	err := insertPoints(db, queries)
 	if err != nil {
 		if err == errMetricDoesNotExist {
-			log.Println(err)
 			w.WriteHeader(404)
 		} else {
-			log.Error(err)
+			log.Errorf("insertPointsHandler: %s", err)
 			if err0 := write400Error(w, err.Error()); err0 != nil {
-				log.Error(err0)
+				log.Errorf("insertPointsHandler: %s", err0)
 			}
 		}
 		return
@@ -132,7 +131,7 @@ func queryPointsHandler(db *dbConn, w http.ResponseWriter, r *http.Request, _ ht
 	if len(typeHeader) != 1 {
 		log.Error("query_points: content-type not set")
 		if err0 := write400Error(w, "content-type not set"); err0 != nil {
-			log.Error(err0)
+			log.Errorf("queryPointsHandler: %s", err0)
 		}
 		return
 	}
@@ -140,7 +139,7 @@ func queryPointsHandler(db *dbConn, w http.ResponseWriter, r *http.Request, _ ht
 	if typeHeader[0] != "application/json" {
 		log.Error("query_points: content-type must be application/json")
 		if err0 := write400Error(w, "content-type must be application/json"); err0 != nil {
-			log.Error(err0)
+			log.Errorf("queryPointsHandler: %s", err0)
 		}
 		return
 	}
@@ -150,9 +149,9 @@ func queryPointsHandler(db *dbConn, w http.ResponseWriter, r *http.Request, _ ht
 	req := &pointsQuery{}
 
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
-		log.Error(err)
+		log.Errorf("queryPointsHandler: %s", err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
-			log.Error(err0)
+			log.Errorf("queryPointsHandler: %s", err0)
 		}
 		return
 	}
@@ -161,12 +160,12 @@ func queryPointsHandler(db *dbConn, w http.ResponseWriter, r *http.Request, _ ht
 
 	if err != nil {
 		if err.Error() == "metric does not exist" {
-			log.Error(err)
+			log.Errorf("queryPointsHandler: %s", err)
 			w.WriteHeader(404)
 		} else {
-			log.Error(err)
+			log.Errorf("queryPointsHandler: %s", err)
 			if err0 := write400Error(w, err.Error()); err0 != nil {
-				log.Error(err0)
+				log.Errorf("queryPointsHandler: %s", err0)
 			}
 		}
 		return
@@ -176,7 +175,7 @@ func queryPointsHandler(db *dbConn, w http.ResponseWriter, r *http.Request, _ ht
 	w.WriteHeader(http.StatusOK)
 
 	if err := json.NewEncoder(w).Encode(points(pts)); err != nil {
-		log.Error(err)
+		log.Errorf("queryPointsHandler: %s", err)
 	}
 }
 
@@ -193,7 +192,7 @@ func deletePointsHandler(db *dbConn, w http.ResponseWriter, r *http.Request, _ h
 	if len(typeHeader) != 1 {
 		log.Error("delete_points: content-type not set")
 		if err0 := write400Error(w, "content-type not set"); err0 != nil {
-			log.Error(err0)
+			log.Errorf("deletePointsHandler: %s", err0)
 		}
 		return
 	}
@@ -201,7 +200,7 @@ func deletePointsHandler(db *dbConn, w http.ResponseWriter, r *http.Request, _ h
 	if typeHeader[0] != "application/json" {
 		log.Error("delete_points: content-type must be application/json")
 		if err0 := write400Error(w, "content-type must be application/json"); err0 != nil {
-			log.Error(err0)
+			log.Errorf("deletePointsHandler: %s", err0)
 		}
 		return
 	}
@@ -210,17 +209,17 @@ func deletePointsHandler(db *dbConn, w http.ResponseWriter, r *http.Request, _ h
 
 	req := &deletePointsQuery{}
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
-		log.Error(err)
+		log.Errorf("deletePointsHandler: %s", err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
-			log.Error(err0)
+			log.Errorf("deletePointsHandler: %s", err0)
 		}
 		return
 	}
 
 	if err := deletePoints(db, req); err != nil {
-		log.Error(err)
+		log.Errorf("deletePointsHandler: %s", err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
-			log.Error(err0)
+			log.Errorf("deletePointsHandler: %s", err0)
 		}
 		return
 	}
@@ -240,7 +239,7 @@ func addDownsamplerHandler(db *dbConn, cancelDownsampleWait chan struct{}, w htt
 	if len(typeHeader) != 1 {
 		log.Error("add_downsampler: content-type not set")
 		if err0 := write400Error(w, "content-type not set"); err0 != nil {
-			log.Error(err0)
+			log.Errorf("addDownsamplerHandler: %s", err0)
 		}
 		return
 	}
@@ -248,7 +247,7 @@ func addDownsamplerHandler(db *dbConn, cancelDownsampleWait chan struct{}, w htt
 	if typeHeader[0] != "application/json" {
 		log.Error("add_downsampler: content-type must be application/json")
 		if err0 := write400Error(w, "content-type must be application/json"); err0 != nil {
-			log.Error(err0)
+			log.Errorf("addDownsamplerHandler: %s", err0)
 		}
 		return
 	}
@@ -260,9 +259,9 @@ func addDownsamplerHandler(db *dbConn, cancelDownsampleWait chan struct{}, w htt
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
-		log.Error(err)
+		log.Errorf("addDownsamplerHandler: %s", err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
-			log.Error(err0)
+			log.Errorf("addDownsamplerHandler: %s", err0)
 		}
 		return
 	}
@@ -270,9 +269,9 @@ func addDownsamplerHandler(db *dbConn, cancelDownsampleWait chan struct{}, w htt
 	err := addDownsampler(db, cancelDownsampleWait, req)
 
 	if err != nil {
-		log.Error(err)
+		log.Errorf("addDownsamplerHandler: %s", err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
-			log.Error(err0)
+			log.Errorf("addDownsamplerHandler: %s", err0)
 		}
 		return
 	}
@@ -289,7 +288,7 @@ func listDownsamplersHandler(db *dbConn, w http.ResponseWriter, r *http.Request,
 
 	downsamplers, err := selectDownsamplers(db)
 	if err != nil {
-		log.Error(err)
+		log.Errorf("listDownsamplersHandler: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -299,7 +298,7 @@ func listDownsamplersHandler(db *dbConn, w http.ResponseWriter, r *http.Request,
 
 	err = json.NewEncoder(w).Encode(downsamplers)
 	if err != nil {
-		log.Error(err)
+		log.Errorf("listDownsamplersHandler: %s", err)
 	}
 }
 
@@ -315,7 +314,7 @@ func deleteDownsamplerHandler(db *dbConn, w http.ResponseWriter, r *http.Request
 	if len(typeHeader) != 1 {
 		log.Error("delete_downsampler: content-type not set")
 		if err0 := write400Error(w, "content-type not set"); err0 != nil {
-			log.Error(err0)
+			log.Errorf("deleteDownsamplerHandler: %s", err0)
 		}
 		return
 	}
@@ -323,7 +322,7 @@ func deleteDownsamplerHandler(db *dbConn, w http.ResponseWriter, r *http.Request
 	if typeHeader[0] != "application/json" {
 		log.Error("delete_downsampler: content-type must be application/json")
 		if err0 := write400Error(w, "content-type must be application/json"); err0 != nil {
-			log.Error(err0)
+			log.Errorf("deleteDownsamplerHandler: %s", err0)
 		}
 		return
 	}
@@ -332,17 +331,17 @@ func deleteDownsamplerHandler(db *dbConn, w http.ResponseWriter, r *http.Request
 
 	del := &deleteDownsamplerRequest{}
 	if err := json.NewDecoder(r.Body).Decode(del); err != nil {
-		log.Error(err)
+		log.Errorf("deleteDownsamplerHandler: %s", err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
-			log.Error(err0)
+			log.Errorf("deleteDownsamplerHandler: %s", err0)
 		}
 		return
 	}
 
 	if err := deleteDownsampler(db, del); err != nil {
-		log.Error(err)
+		log.Errorf("deleteDownsamplerHandler: %s", err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
-			log.Error(err0)
+			log.Errorf("deleteDownsamplerHandler: %s", err0)
 		}
 		return
 	}

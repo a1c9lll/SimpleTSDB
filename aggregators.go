@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"sort"
+	"time"
 )
 
 var (
@@ -13,7 +14,129 @@ var (
 	errFillValueRequired   = errors.New("fillValue must be set for fill aggregator")
 	errUsePreviousType     = errors.New("usePrevious must be boolean")
 	errFillValueType       = errors.New("fillValue must be int or float")
+	errCreateEmptyType     = errors.New("createEmpty must be boolean")
+	errEveryType           = errors.New("every must be boolean in window aggregator")
+	errEveryRequired       = errors.New("every field is required in window aggregator")
 )
+
+func window(startTime, endTime int64, options map[string]interface{}, points []*point) ([]*point, error) {
+	if _, ok := options["every"]; !ok {
+		return nil, errEveryRequired
+	}
+
+	var (
+		window time.Duration
+		err    error
+	)
+	switch v1 := options["every"].(type) {
+	case string:
+		window, err = time.ParseDuration(v1)
+
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errEveryType
+	}
+
+	var (
+		createEmpty bool
+	)
+
+	if v, ok := options["createEmpty"]; ok {
+		switch v1 := v.(type) {
+		case bool:
+			createEmpty = v1
+		default:
+			return nil, errCreateEmptyType
+		}
+	}
+
+	// We create a new slice of points if we're filling gaps
+	if createEmpty {
+		newPoints := []*point{}
+		windowDur := window.Nanoseconds()
+		currentPoint := 0
+		startWindowTime, endWindowTime := startTime-startTime%windowDur, endTime-endTime%windowDur
+		for windowTime := startWindowTime; windowTime <= endWindowTime; windowTime += windowDur {
+			found := false
+			for ; currentPoint < len(points); currentPoint++ {
+				pt := points[currentPoint]
+				if pt.Timestamp >= windowTime && pt.Timestamp < windowTime+windowDur {
+					pt.Window = windowTime
+					newPoints = append(newPoints, pt)
+					found = true
+				} else {
+					break
+				}
+			}
+			if !found {
+				newPoints = append(newPoints, &point{
+					Value:     0,
+					Timestamp: windowTime,
+					Window:    windowTime,
+					Null:      true,
+				})
+			}
+		}
+		return newPoints, nil
+	}
+
+	// We're not filling gaps
+	windowDur := window.Nanoseconds()
+	currentPoint := 0
+	startWindowTime, endWindowTime := startTime-startTime%windowDur, endTime-endTime%windowDur
+
+	for windowTime := startWindowTime; windowTime <= endWindowTime; windowTime += windowDur {
+		for ; currentPoint < len(points); currentPoint++ {
+			pt := points[currentPoint]
+			if pt.Timestamp >= windowTime && pt.Timestamp < windowTime+windowDur {
+				pt.Window = windowTime
+			} else {
+				break
+			}
+		}
+	}
+
+	return points, nil
+}
+
+func bucketize(points []*point) [][]*point {
+	if len(points) == 0 {
+		return [][]*point{}
+	}
+
+	var (
+		lastWindow int64
+		buckets    [][]*point
+		idxStart   int
+		idxEnd     int
+	)
+
+	idxStart = 0
+	idxEnd = 1
+	lastWindow = points[0].Window
+
+	if len(points) > 1 {
+		for i := 1; i < len(points); i++ {
+			pt := points[i]
+			if pt.Window == lastWindow {
+				idxEnd++
+			} else {
+				buckets = append(buckets, points[idxStart:idxEnd])
+				idxStart = i
+				idxEnd = i + 1
+			}
+			lastWindow = pt.Window
+		}
+	}
+
+	if idxEnd-idxStart > 0 {
+		buckets = append(buckets, points[idxStart:idxEnd])
+	}
+
+	return buckets
+}
 
 func last(points []*point) []*point {
 	if len(points) == 0 {
@@ -321,20 +444,6 @@ func min(points []*point) []*point {
 	}
 
 	return minnedPoints
-}
-
-func min0(a, b float64) float64 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max0(a, b float64) float64 {
-	if a > b {
-		return a
-	}
-	return b
 }
 
 func mean(points []*point) []*point {
