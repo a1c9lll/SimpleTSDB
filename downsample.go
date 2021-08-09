@@ -98,7 +98,6 @@ func handleDownsamplers(db *dbConn, workerID int, cancelDownsampleWait chan stru
 			if err.Error() == errStrNoRowsInResultSet {
 				select {
 				case <-cancelDownsampleWait:
-				case <-time.After(time.Second):
 				}
 				continue
 			}
