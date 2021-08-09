@@ -56,7 +56,7 @@ func handleDownsamplers(db *dbConn, workerID int, cancelDownsampleWait chan stru
 				time.Now().UnixNano(),
 				workerID,
 			}
-			row := db.QueryRow("select id,metric,out_metric,run_every,last_downsampled_window,query,(last_updated + run_every)::bigint - $1 as time_until_update from simpletsdb_downsamplers where worker_id = $2 order by time_until_update asc limit 1", vals...)
+			row := db.QueryRow("SELECT id,metric,out_metric,run_every,last_downsampled_window,query,(last_updated + run_every)::bigint - $1 AS time_until_update FROM simpletsdb_downsamplers WHERE worker_id = $2 ORDER BY time_until_update ASC LIMIT 1", vals...)
 			err := row.Scan(
 				&ds.ID,
 				&ds.Metric,
@@ -106,6 +106,11 @@ func handleDownsamplers(db *dbConn, workerID int, cancelDownsampleWait chan stru
 			case <-cancelDownsampleWait:
 				goto start
 			case <-time.After(time.Duration(timeUntilUpdate)):
+			}
+		} else {
+			select {
+			case <-cancelDownsampleWait:
+			default:
 			}
 		}
 		t0 := time.Now()

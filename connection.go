@@ -19,7 +19,7 @@ var (
 	downsamplerWorkerCount = 32
 )
 
-func initDB(pgUser, pgPassword, pgHost string, pgPort int, pgDB, pgSSLMode string, nWorkers int) (*dbConn, chan int, chan struct{}) {
+func initDB(pgUser, pgPassword, pgHost string, pgPort int, pgDB, pgSSLMode string, nWorkers int) (*dbConn, chan int, []chan struct{}) {
 	var passwordString string
 	if pgPassword != "" {
 		passwordString = fmt.Sprintf("password='%s' ", pgPassword)
@@ -128,10 +128,11 @@ CREATE TABLE %s (
 	nextDownsamplerIDChan := make(chan int)
 	go downsampleCountCoordinator(db, downsamplersCount, nextDownsamplerIDChan)
 
-	cancelDownsampleWait := make(chan struct{})
+	cancelDownsampleWait := make([]chan struct{}, downsamplerWorkerCount)
 	for i := 0; i < downsamplerWorkerCount; i++ {
 		i := i
-		go handleDownsamplers(db, i, cancelDownsampleWait)
+		cancelDownsampleWait[i] = make(chan struct{})
+		go handleDownsamplers(db, i, cancelDownsampleWait[i])
 	}
 
 	return db, nextDownsamplerIDChan, cancelDownsampleWait

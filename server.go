@@ -16,7 +16,7 @@ var (
 	readLineProtocolBufferSize = 65536
 )
 
-func initServer(db *dbConn, downsamplersCountChan chan int, cancelDownsampleWait chan struct{}, tsdbHost string, tsdbPort int, tsdbReadTimeout, tsdbWriteTimeout time.Duration, readLineProtocolBufferSizeP int) {
+func initServer(db *dbConn, downsamplersCountChan chan int, cancelDownsampleWait []chan struct{}, tsdbHost string, tsdbPort int, tsdbReadTimeout, tsdbWriteTimeout time.Duration, readLineProtocolBufferSizeP int) {
 	router := httprouter.New()
 	router.POST("/insert_points", withDB(db, insertPointsHandler))
 	router.POST("/query_points", withDB(db, queryPointsHandler))
@@ -38,7 +38,7 @@ func initServer(db *dbConn, downsamplersCountChan chan int, cancelDownsampleWait
 	log.Fatalf("initServer: %s", s.ListenAndServe())
 }
 
-func withDbAndDownsamplerChannels(db *dbConn, downsamplersCountChan chan int, cancelDownsampleWait chan struct{}, fn func(*dbConn, chan int, chan struct{}, http.ResponseWriter, *http.Request, httprouter.Params)) func(http.ResponseWriter, *http.Request, httprouter.Params) {
+func withDbAndDownsamplerChannels(db *dbConn, downsamplersCountChan chan int, cancelDownsampleWait []chan struct{}, fn func(*dbConn, chan int, []chan struct{}, http.ResponseWriter, *http.Request, httprouter.Params)) func(http.ResponseWriter, *http.Request, httprouter.Params) {
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		fn(db, downsamplersCountChan, cancelDownsampleWait, w, r, ps)
 	}
@@ -231,7 +231,7 @@ func deletePointsHandler(db *dbConn, w http.ResponseWriter, r *http.Request, _ h
 Returns 400 on invalid request
 Returns 200 on successful request
 */
-func addDownsamplerHandler(db *dbConn, downsamplersCountChan chan int, cancelDownsampleWait chan struct{}, w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func addDownsamplerHandler(db *dbConn, downsamplersCountChan chan int, cancelDownsampleWait []chan struct{}, w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Infof("add_downsampler request from %s", r.RemoteAddr)
 
 	typeHeader := r.Header.Values("Content-Type")

@@ -193,7 +193,10 @@ func TestDownsamplerAPI(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	c2 := make(chan struct{}, 1)
+	c2 := make([]chan struct{}, downsamplerWorkerCount)
+	for i := 0; i < downsamplerWorkerCount; i++ {
+		c2[i] = make(chan struct{}, 1)
+	}
 	addDownsamplerHandler(db0, downsamplersCountTest, c2, w, req, nil)
 
 	resp := w.Result()

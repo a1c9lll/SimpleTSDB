@@ -531,7 +531,7 @@ func deletePoints(db *dbConn, query *deletePointsQuery) error {
 	return nil
 }
 
-func addDownsampler(db *dbConn, downsamplersCountChan chan int, cancelDownsampleWait chan struct{}, ds *downsampler) error {
+func addDownsampler(db *dbConn, downsamplersCountChan chan int, cancelDownsampleWait []chan struct{}, ds *downsampler) error {
 	if ds.Metric == "" {
 		return errMetricRequired
 	}
@@ -579,8 +579,9 @@ func addDownsampler(db *dbConn, downsamplersCountChan chan int, cancelDownsample
 	if err := json.NewEncoder(buf).Encode(ds.Query); err != nil {
 		return err
 	}
+	workerID := <-downsamplersCountChan
 	vals = append(vals, buf.String())
-	vals = append(vals, <-downsamplersCountChan)
+	vals = append(vals, workerID)
 
 	err = db.Query(priorityDownsamplers, func(session *sql.DB) error {
 		row := session.QueryRow(query, vals...)
@@ -596,7 +597,7 @@ func addDownsampler(db *dbConn, downsamplersCountChan chan int, cancelDownsample
 		return err
 	}
 
-	cancelDownsampleWait <- struct{}{}
+	cancelDownsampleWait[workerID] <- struct{}{}
 
 	return nil
 }
