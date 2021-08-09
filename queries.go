@@ -562,7 +562,7 @@ func addDownsampler(db *dbConn, downsamplersCountChan chan int, cancelDownsample
 	if len(ds.Query.Aggregators) == 0 {
 		return errOneAggregatorRequiredForDownsampler
 	}
-	query := fmt.Sprintf("INSERT INTO %s (metric,out_metric,last_updated,run_every,query,worker_id) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id", downsamplersTable)
+	query := fmt.Sprintf("INSERT INTO %s (metric,out_metric,time_update_at,run_every,query,worker_id) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id", downsamplersTable)
 	vals := []interface{}{
 		ds.Metric,
 		ds.OutMetric,
@@ -586,9 +586,6 @@ func addDownsampler(db *dbConn, downsamplersCountChan chan int, cancelDownsample
 	vals = append(vals, buf.String())
 	vals = append(vals, workerID)
 
-	for _, x := range vals {
-		fmt.Println(x)
-	}
 	err = db.Query(priorityDownsamplers, func(session *sql.DB) error {
 		t7 := time.Now()
 		row := session.QueryRow(query, vals...)
@@ -611,6 +608,96 @@ func addDownsampler(db *dbConn, downsamplersCountChan chan int, cancelDownsample
 	return nil
 }
 
+func generateDownsamplersQueryAndValues(dss []*downsampler, downsamplerCountChan chan int) (string, []interface{}, []int, error) {
+	str := &strings.Builder{}
+	values := []interface{}{}
+	workerIDs := []int{}
+	i := 1
+	for z, ds := range dss {
+		if ds.Metric == "" {
+			return "", nil, nil, errMetricRequired
+		}
+		if ds.OutMetric == "" {
+			return "", nil, nil, errOutMetricRequired
+		}
+		if !metricAndTagsRe.MatchString(ds.Metric) {
+			return "", nil, nil, errUnsupportedMetricName
+		}
+		if !metricAndTagsRe.MatchString(ds.OutMetric) {
+			return "", nil, nil, errUnsupportedOutMetricName
+		}
+		if ds.Query == nil {
+			return "", nil, nil, errQueryRequiredForDownsampler
+		}
+		if ds.Query.Window == nil {
+			return "", nil, nil, errWindowRequiredForDownsampler
+		}
+		if _, ok := ds.Query.Window["every"]; !ok {
+			return "", nil, nil, errEveryRequired
+		}
+		if ds.RunEvery == "" {
+			return "", nil, nil, errRunEveryRequiredForDownsampler
+		}
+		if ds.Query.Aggregators == nil {
+			return "", nil, nil, errAggregatorsRequiredForDownsampler
+		}
+		if len(ds.Query.Aggregators) == 0 {
+			return "", nil, nil, errOneAggregatorRequiredForDownsampler
+		}
+		//metric,out_metric,time_update_at,run_every,query,worker_id
+		values = append(values, ds.Metric)
+		values = append(values, ds.OutMetric)
+		values = append(values, 0)
+		dur, err := time.ParseDuration(ds.RunEvery)
+		if err != nil {
+			return "", nil, nil, err
+		}
+		values = append(values, dur.Nanoseconds())
+		bs, err := json.Marshal(ds.Query)
+		if err != nil {
+			return "", nil, nil, err
+		}
+		values = append(values, string(bs))
+		workerID := <-downsamplerCountChan
+		values = append(values, workerID)
+		if len(workerIDs) < downsamplerWorkerCount {
+			workerIDs = append(workerIDs, workerID)
+		}
+		str.WriteString(fmt.Sprintf("($%d,$%d,$%d,$%d,$%d,$%d)", i, i+1, i+2, i+3, i+4, i+5))
+		if z+1 < len(dss) {
+			str.WriteString(",")
+		}
+		i += 6
+	}
+
+	return str.String(), values, workerIDs, nil
+}
+
+func addDownsamplers(db *dbConn, downsamplersCountChan chan int, cancelDownsampleWait []chan struct{}, downsamplers []*downsampler) error {
+	insertStr, values, workerIDs, err := generateDownsamplersQueryAndValues(downsamplers, downsamplersCountChan)
+	if err != nil {
+		return err
+	}
+	query := fmt.Sprintf("INSERT INTO %s (metric,out_metric,time_update_at,run_every,query,worker_id) VALUES %s", downsamplersTable, insertStr)
+
+	err = db.Query(priorityDownsamplers, func(session *sql.DB) error {
+		t7 := time.Now()
+		_, err = session.Exec(query, values...)
+		fmt.Println("downsample insert time=", time.Since(t7))
+		return err
+	})
+	if err != nil {
+		return err
+	}
+
+	t0 := time.Now()
+	for _, workerID := range workerIDs {
+		cancelDownsampleWait[workerID] <- struct{}{}
+	}
+	fmt.Println("downsamples cancel wait time = ", time.Since(t0))
+	return nil
+}
+
 func deleteDownsampler(db *dbConn, ds *deleteDownsamplerRequest) error {
 	query := fmt.Sprintf("DELETE FROM %s WHERE id = $1", downsamplersTable)
 	vals := []interface{}{
@@ -625,13 +712,6 @@ func deleteDownsampler(db *dbConn, ds *deleteDownsamplerRequest) error {
 	})
 	if err != nil {
 		return err
-	}
-
-	for i, d := range downsamplers {
-		if d.ID == ds.ID {
-			downsamplers = append(downsamplers[:i], downsamplers[i+1:]...)
-			break
-		}
 	}
 
 	return nil

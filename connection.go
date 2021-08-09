@@ -15,7 +15,6 @@ var (
 	metricsTable           = `simpletsdb_metrics`
 	downsamplersTable      = `simpletsdb_downsamplers`
 	metaTable              = `simpletsdb_meta`
-	downsamplers           []*downsampler
 	downsamplerWorkerCount = 32
 )
 
@@ -67,17 +66,19 @@ CREATE TABLE %s (
   out_metric text,
   run_every bigint,
   last_downsampled_window bigint,
-	last_updated bigint NOT NULL,
+	time_update_at bigint NOT NULL,
 	worker_id int,
   query jsonb
 )
 		`, downsamplersTable))
 
+	session.Exec(fmt.Sprintf(`CREATE INDEX %s_worker_id_idx ON %s(worker_id)`, downsamplersTable, downsamplersTable))
+	session.Exec(fmt.Sprintf(`CREATE INDEX %s_time_update_at_idx ON %s(time_update_at)`, downsamplersTable, downsamplersTable))
+
 	session.Exec(fmt.Sprintf(`
 		CREATE TABLE %s (
 			worker_id_count int
-		)
-				`, metaTable))
+		)`, metaTable))
 
 	db := &dbConn{queue: &priorityQueue{}, cond: sync.NewCond(&sync.Mutex{})}
 	heap.Init(db.queue)

@@ -43,8 +43,8 @@ func handleDownsamplers(db *dbConn, workerID int, cancelDownsampleWait chan stru
 	for {
 	start:
 		var (
-			timeUntilUpdate int64
-			ds              = &downsampler{}
+			timeUpdateAt int64
+			ds           = &downsampler{}
 		)
 		err := db.Query(priorityDownsamplers, func(db *sql.DB) error {
 			var (
@@ -53,10 +53,11 @@ func handleDownsamplers(db *dbConn, workerID int, cancelDownsampleWait chan stru
 				lastDownsampledWindow interface{}
 			)
 			vals := []interface{}{
-				time.Now().UnixNano(),
 				workerID,
 			}
-			row := db.QueryRow("SELECT id,metric,out_metric,run_every,last_downsampled_window,query,(last_updated + run_every)::bigint - $1 AS time_until_update FROM simpletsdb_downsamplers WHERE worker_id = $2 ORDER BY time_until_update ASC LIMIT 1", vals...)
+			t0 := time.Now()
+			row := db.QueryRow("SELECT id,metric,out_metric,run_every,last_downsampled_window,query,time_update_at FROM simpletsdb_downsamplers WHERE worker_id = $1 ORDER BY time_update_at ASC LIMIT 1", vals...)
+			fmt.Println("query took", time.Since(t0))
 			err := row.Scan(
 				&ds.ID,
 				&ds.Metric,
@@ -64,7 +65,7 @@ func handleDownsamplers(db *dbConn, workerID int, cancelDownsampleWait chan stru
 				&runEvery,
 				&lastDownsampledWindow,
 				&queryJSON,
-				&timeUntilUpdate,
+				&timeUpdateAt,
 			)
 			if err != nil {
 				return err
@@ -101,7 +102,9 @@ func handleDownsamplers(db *dbConn, workerID int, cancelDownsampleWait chan stru
 			}
 			panic(err)
 		}
+		timeUntilUpdate := timeUpdateAt - time.Now().UnixNano()
 		if timeUntilUpdate > 0 {
+			//fmt.Println("waiting", time.Duration(timeUntilUpdate).String())
 			select {
 			case <-cancelDownsampleWait:
 				goto start
@@ -124,9 +127,9 @@ func handleDownsamplers(db *dbConn, workerID int, cancelDownsampleWait chan stru
 		}
 
 		err = db.Query(priorityDownsamplers, func(db *sql.DB) error {
-			query := fmt.Sprintf("UPDATE %s SET last_updated = $1 WHERE id = $2", downsamplersTable)
+			query := fmt.Sprintf("UPDATE %s SET time_update_at = $1 WHERE id = $2", downsamplersTable)
 			vals := []interface{}{
-				time.Now().UnixNano(),
+				time.Now().UnixNano() + ds.RunEveryDur.Nanoseconds(),
 				ds.ID,
 			}
 			_, err := db.Exec(query, vals...)

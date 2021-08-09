@@ -259,8 +259,106 @@ func TestDownsamplerAPI(t *testing.T) {
 		t.Fatalf("expected 0 downsamplers, got %d", len(ds0))
 	}
 
-	if len(downsamplers) != 0 {
-		fmt.Println(downsamplers[0].ID)
-		t.Fatalf("expected 0 downsamplers in slice, got %d - %d", len(downsamplers), downsamplers[0].ID)
+	// test add downsamplers
+	dss := []*downsampler{
+		{
+			Metric:    "test123",
+			OutMetric: "test123_30m",
+			RunEvery:  "30m",
+			Query: &downsampleQuery{
+				Tags: map[string]string{
+					"id": "2",
+				},
+				Window: map[string]interface{}{
+					"every": "30m",
+				},
+				Aggregators: []*aggregatorQuery{
+					{Name: "mean"},
+				},
+			},
+		}, {
+			Metric:    "test123",
+			OutMetric: "test123_30m",
+			RunEvery:  "30m",
+			Query: &downsampleQuery{
+				Tags: map[string]string{
+					"id": "3",
+				},
+				Window: map[string]interface{}{
+					"every": "30m",
+				},
+				Aggregators: []*aggregatorQuery{
+					{Name: "mean"},
+				},
+			},
+		},
+	}
+
+	buf = &bytes.Buffer{}
+	if err := json.NewEncoder(buf).Encode(dss); err != nil {
+		t.Fatal(err)
+	}
+
+	req = httptest.NewRequest("POST", "/add_downsamplers", buf)
+	req.Header.Add("Content-Type", "application/json")
+
+	w = httptest.NewRecorder()
+
+	addDownsamplersHandler(db0, downsamplersCountTest, downsamplersCancelWaitTest, w, req, nil)
+
+	resp = w.Result()
+
+	bod, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 {
+		t.Fatalf("got status code: %d, body: %s", resp.StatusCode, string(bod))
+	}
+
+	// list after add downsamplers
+
+	req = httptest.NewRequest("GET", "/list_downsamplers", nil)
+
+	w = httptest.NewRecorder()
+
+	listDownsamplersHandler(db0, w, req, nil)
+
+	resp = w.Result()
+
+	if resp.StatusCode != 200 {
+		t.Fatal()
+	}
+
+	downsamplers1 := []*downsampler{}
+	if err = json.NewDecoder(resp.Body).Decode(&downsamplers1); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(downsamplers1) != 2 {
+		t.Fatalf("expected 2 downsamplers, got %d", len(downsamplers1))
+	}
+
+	// clean up
+	for _, d := range downsamplers1 {
+		buf := &bytes.Buffer{}
+		if err := json.NewEncoder(buf).Encode(&deleteDownsamplerRequest{
+			ID: d.ID,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		req := httptest.NewRequest("POST", "/delete_downsampler", buf)
+		req.Header.Add("Content-Type", "application/json")
+
+		w := httptest.NewRecorder()
+
+		deleteDownsamplerHandler(db0, w, req, nil)
+
+		resp := w.Result()
+
+		body, _ := ioutil.ReadAll(resp.Body)
+		if resp.StatusCode != 200 {
+			t.Fatal(string(body))
+		}
 	}
 }

@@ -22,6 +22,7 @@ func initServer(db *dbConn, downsamplersCountChan chan int, cancelDownsampleWait
 	router.POST("/query_points", withDB(db, queryPointsHandler))
 	router.DELETE("/delete_points", withDB(db, deletePointsHandler))
 	router.POST("/add_downsampler", withDbAndDownsamplerChannels(db, downsamplersCountChan, cancelDownsampleWait, addDownsamplerHandler))
+	router.POST("/add_downsamplers", withDbAndDownsamplerChannels(db, downsamplersCountChan, cancelDownsampleWait, addDownsamplersHandler))
 	router.GET("/list_downsamplers", withDB(db, listDownsamplersHandler))
 	router.DELETE("/delete_downsampler", withDB(db, deleteDownsamplerHandler))
 
@@ -270,6 +271,56 @@ func addDownsamplerHandler(db *dbConn, downsamplersCountChan chan int, cancelDow
 		log.Errorf("addDownsamplerHandler: %s", err)
 		if err0 := write400Error(w, err.Error()); err0 != nil {
 			log.Errorf("addDownsamplerHandler: %s", err0)
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+/*
+Returns 400 on invalid request
+Returns 200 on successful request
+*/
+func addDownsamplersHandler(db *dbConn, downsamplersCountChan chan int, cancelDownsampleWait []chan struct{}, w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	log.Infof("add_downsamplers request from %s", r.RemoteAddr)
+
+	typeHeader := r.Header.Values("Content-Type")
+
+	if len(typeHeader) != 1 {
+		log.Error("add_downsamplers: content-type not set")
+		if err0 := write400Error(w, "content-type not set"); err0 != nil {
+			log.Errorf("addDownsamplersHandler: %s", err0)
+		}
+		return
+	}
+
+	if typeHeader[0] != "application/json" {
+		log.Error("add_downsamplers: content-type must be application/json")
+		if err0 := write400Error(w, "content-type must be application/json"); err0 != nil {
+			log.Errorf("addDownsamplersHandler: %s", err0)
+		}
+		return
+	}
+
+	defer r.Body.Close()
+
+	req := []*downsampler{}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Errorf("addDownsamplersHandler: %s", err)
+		if err0 := write400Error(w, err.Error()); err0 != nil {
+			log.Errorf("addDownsamplersHandler: %s", err0)
+		}
+		return
+	}
+
+	err := addDownsamplers(db, downsamplersCountChan, cancelDownsampleWait, req)
+
+	if err != nil {
+		log.Errorf("addDownsamplersHandler: %s", err)
+		if err0 := write400Error(w, err.Error()); err0 != nil {
+			log.Errorf("addDownsamplersHandler: %s", err0)
 		}
 		return
 	}
