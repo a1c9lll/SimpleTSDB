@@ -16,9 +16,9 @@ var (
 	errLastDownsampledWindowType = errors.New("incorrect type for lastDownsampledWindow")
 )
 
-func downsampleCountCoordinator(db *dbConn, downsamplersCount int, nextDownsamplerIDChan chan int) {
+func downsampleCountCoordinator(db *dbConn, downsamplersCount int, nextDownsamplerID chan int) {
 	for {
-		nextDownsamplerIDChan <- downsamplersCount
+		nextDownsamplerID <- downsamplersCount
 		downsamplersCount++
 		if downsamplersCount >= downsamplerWorkerCount {
 			downsamplersCount = 0
@@ -96,9 +96,7 @@ func handleDownsamplers(db *dbConn, workerID int, cancelDownsampleWait chan stru
 		})
 		if err != nil {
 			if err.Error() == errStrNoRowsInResultSet {
-				select {
-				case <-cancelDownsampleWait:
-				}
+				<-cancelDownsampleWait
 				continue
 			}
 			panic(err)
@@ -138,7 +136,7 @@ func handleDownsamplers(db *dbConn, workerID int, cancelDownsampleWait chan stru
 			panic(err)
 		}
 		t1 := time.Since(t0)
-		log.Infof("downsample %d took %dms", ds.ID, t1.Milliseconds())
+		log.Debugf("downsample %d took %dms", ds.ID, t1.Milliseconds())
 	}
 }
 

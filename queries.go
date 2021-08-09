@@ -568,6 +568,7 @@ func addDownsampler(db *dbConn, downsamplersCountChan chan int, cancelDownsample
 		ds.OutMetric,
 		0,
 	}
+
 	dur, err := time.ParseDuration(ds.RunEvery)
 	if err != nil {
 		return err
@@ -579,15 +580,22 @@ func addDownsampler(db *dbConn, downsamplersCountChan chan int, cancelDownsample
 	if err := json.NewEncoder(buf).Encode(ds.Query); err != nil {
 		return err
 	}
+	t9 := time.Now()
 	workerID := <-downsamplersCountChan
+	fmt.Println("downsample count chan time=", time.Since(t9))
 	vals = append(vals, buf.String())
 	vals = append(vals, workerID)
 
+	for _, x := range vals {
+		fmt.Println(x)
+	}
 	err = db.Query(priorityDownsamplers, func(session *sql.DB) error {
+		t7 := time.Now()
 		row := session.QueryRow(query, vals...)
 		if err := row.Scan(&ds.ID); err != nil {
 			return err
 		}
+		fmt.Println("downsample insert time=", time.Since(t7))
 		if err := row.Err(); err != nil {
 			return err
 		}
@@ -597,8 +605,9 @@ func addDownsampler(db *dbConn, downsamplersCountChan chan int, cancelDownsample
 		return err
 	}
 
+	t0 := time.Now()
 	cancelDownsampleWait[workerID] <- struct{}{}
-
+	fmt.Println("downsample cancel wait time = ", time.Since(t0))
 	return nil
 }
 

@@ -125,8 +125,8 @@ CREATE TABLE %s (
 		log.Fatalf("initDB: downsampleCoordinator start: %s", err)
 	}
 
-	nextDownsamplerIDChan := make(chan int)
-	go downsampleCountCoordinator(db, downsamplersCount, nextDownsamplerIDChan)
+	nextDownsamplerID := make(chan int)
+	go downsampleCountCoordinator(db, downsamplersCount, nextDownsamplerID)
 
 	cancelDownsampleWait := make([]chan struct{}, downsamplerWorkerCount)
 	for i := 0; i < downsamplerWorkerCount; i++ {
@@ -135,5 +135,5 @@ CREATE TABLE %s (
 		go handleDownsamplers(db, i, cancelDownsampleWait[i])
 	}
 
-	return db, nextDownsamplerIDChan, cancelDownsampleWait
+	return db, nextDownsamplerID, cancelDownsampleWait
 }
