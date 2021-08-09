@@ -96,7 +96,10 @@ func handleDownsamplers(db *dbConn, workerID int, cancelDownsampleWait chan stru
 		})
 		if err != nil {
 			if err.Error() == errStrNoRowsInResultSet {
-				time.Sleep(time.Second)
+				select {
+				case <-cancelDownsampleWait:
+				case <-time.After(time.Second):
+				}
 				continue
 			}
 			panic(err)

@@ -193,11 +193,7 @@ func TestDownsamplerAPI(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	c2 := make([]chan struct{}, downsamplerWorkerCount)
-	for i := 0; i < downsamplerWorkerCount; i++ {
-		c2[i] = make(chan struct{}, 1)
-	}
-	addDownsamplerHandler(db0, downsamplersCountTest, c2, w, req, nil)
+	addDownsamplerHandler(db0, downsamplersCountTest, downsamplersCancelWaitTest, w, req, nil)
 
 	resp := w.Result()
 
@@ -209,7 +205,7 @@ func TestDownsamplerAPI(t *testing.T) {
 		t.Fatalf("got status code: %d, body: %s", resp.StatusCode, string(bod))
 	}
 
-	// Test list
+	// test list
 	req = httptest.NewRequest("GET", "/list_downsamplers", nil)
 
 	w = httptest.NewRecorder()

@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	db0                   *dbConn
-	downsamplersCountTest chan int
+	db0                        *dbConn
+	downsamplersCountTest      chan int
+	downsamplersCancelWaitTest []chan struct{}
 )
 
 func TestMain(t *testing.T) {
@@ -30,7 +31,7 @@ func TestMain(t *testing.T) {
 	if p, ok := cfg["postgres_password"]; ok {
 		pgPassword = p
 	}
-	db0, downsamplersCountTest, _ = initDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], port, cfg["postgres_db"]+"_test", cfg["postgres_ssl_mode"], 1)
+	db0, downsamplersCountTest, downsamplersCancelWaitTest = initDB(cfg["postgres_username"], pgPassword, cfg["postgres_host"], port, cfg["postgres_db"]+"_test", cfg["postgres_ssl_mode"], 1)
 
 	err = db0.Query(0, func(db *sql.DB) error {
 		_, err = db.Exec("DELETE FROM simpletsdb_metrics WHERE true")
