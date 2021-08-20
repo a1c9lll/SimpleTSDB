@@ -23,17 +23,19 @@ func downsampleCountCoordinator(db *dbConn, downsamplersCount int, nextDownsampl
 		if downsamplersCount >= downsamplerWorkerCount {
 			downsamplersCount = 0
 		}
-		err := db.Query(priorityDownsamplers, func(db *sql.DB) error {
-			query := fmt.Sprintf("UPDATE %s SET worker_id_count = $1", metaTable)
-			_, err := db.Exec(query, downsamplersCount)
+		/*
+			err := db.Query(priorityDownsamplers+2, func(db *sql.DB) error {
+				query := fmt.Sprintf("UPDATE %s SET worker_id_count = $1", metaTable)
+
+				_, err := db.Exec(query, downsamplersCount)
+				if err != nil {
+					return err
+				}
+				return nil
+			})
 			if err != nil {
-				return err
-			}
-			return nil
-		})
-		if err != nil {
-			log.Errorf("downsampleCoordinator: %s", err)
-		}
+				log.Errorf("downsampleCoordinator: %s", err)
+			}*/
 	}
 }
 
@@ -55,9 +57,9 @@ func handleDownsamplers(db *dbConn, workerID int, cancelDownsampleWait chan stru
 			vals := []interface{}{
 				workerID,
 			}
-			t0 := time.Now()
+			//t0 := time.Now()
 			row := db.QueryRow("SELECT id,metric,out_metric,run_every,last_downsampled_window,query,time_update_at FROM simpletsdb_downsamplers WHERE worker_id = $1 ORDER BY time_update_at ASC LIMIT 1", vals...)
-			fmt.Println("query took", time.Since(t0))
+			//fmt.Println("query took", time.Since(t0))
 			err := row.Scan(
 				&ds.ID,
 				&ds.Metric,
@@ -107,8 +109,17 @@ func handleDownsamplers(db *dbConn, workerID int, cancelDownsampleWait chan stru
 			//fmt.Println("waiting", time.Duration(timeUntilUpdate).String())
 			select {
 			case <-cancelDownsampleWait:
+				if len(cancelDownsampleWait) > 0 {
+					for i := 0; i < len(cancelDownsampleWait); i++ {
+						<-cancelDownsampleWait
+					}
+				}
 				goto start
 			case <-time.After(time.Duration(timeUntilUpdate)):
+				select {
+				case <-cancelDownsampleWait:
+				default:
+				}
 			}
 		} else {
 			select {

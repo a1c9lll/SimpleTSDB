@@ -239,7 +239,7 @@ func createIndex(db *dbConn, tags []string) {
 	}
 }
 
-func uniqueTags(haystack [][]string, needle []string) bool {
+/*func uniqueTags(haystack [][]string, needle []string) bool {
 	m := map[string]struct{}{}
 	for _, s := range haystack {
 		m[generateTagsIndexString(s)] = struct{}{}
@@ -247,6 +247,30 @@ func uniqueTags(haystack [][]string, needle []string) bool {
 	_, ok := m[generateTagsIndexString(needle)]
 
 	return !ok
+}*/
+
+func containsAll(arr1 []string, arr2 []string) bool {
+	if len(arr1) != len(arr2) {
+		return false
+	}
+	for i := 0; i < len(arr1); i++ {
+		if arr2[i] != arr1[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func uniqueTags(haystack [][]string, needle []string) bool {
+	unique := true
+finished:
+	for _, ss := range haystack {
+		if containsAll(ss, needle) {
+			unique = false
+			break finished
+		}
+	}
+	return unique
 }
 
 func generateInsertStringsAndValues(queries []*insertPointQuery) (string, []interface{}, [][]string, error) {
@@ -681,6 +705,7 @@ func addDownsamplers(db *dbConn, downsamplersCountChan chan int, cancelDownsampl
 	query := fmt.Sprintf("INSERT INTO %s (metric,out_metric,time_update_at,run_every,query,worker_id) VALUES %s", downsamplersTable, insertStr)
 
 	err = db.Query(priorityDownsamplers, func(session *sql.DB) error {
+
 		t7 := time.Now()
 		_, err = session.Exec(query, values...)
 		fmt.Println("downsample insert time=", time.Since(t7))

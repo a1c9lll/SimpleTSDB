@@ -132,7 +132,7 @@ CREATE TABLE %s (
 	cancelDownsampleWait := make([]chan struct{}, downsamplerWorkerCount)
 	for i := 0; i < downsamplerWorkerCount; i++ {
 		i := i
-		cancelDownsampleWait[i] = make(chan struct{})
+		cancelDownsampleWait[i] = make(chan struct{}, 100)
 		go handleDownsamplers(db, i, cancelDownsampleWait[i])
 	}
 
